@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "37signals.basecamp",
+  "name": "Basecamp",
+  "version": "1.0.0",
+  "author": "37signals",
+  "license": "MIT",
+  "description": "Notifications from every Basecamp account available through the Basecamp CLI.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Basecamp",
+    "description": "Unread count and recent notifications from all authorized Basecamp accounts.",
+    "category": "Communication",
+    "aliases": ["basecamp", "notifications"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 600,
+      "maxPerAccount": 20
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 60,
+        "max": 3600,
+        "step": 60,
+        "defaultValue": 600
+      },
+      {
+        "key": "maxPerAccount",
+        "type": "integer",
+        "label": "Notifications per account",
+        "min": 5,
+        "max": 50,
+        "step": 5,
+        "defaultValue": 20
+      }
+    ]
+  }
+}
