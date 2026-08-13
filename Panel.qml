@@ -323,7 +323,7 @@ Panel {
               font.weight: Font.DemiBold
               Layout.preferredWidth: Style.space(48)
               Layout.alignment: Qt.AlignTop
-              Layout.topMargin: Style.space(4)
+              Layout.topMargin: Style.space(8)
             }
 
             Flow {
