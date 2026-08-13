@@ -26,6 +26,28 @@ Panel {
   readonly property var filteredNotifications: Model.filterNotifications(service.notifications, accountFilter, stateFilter)
   readonly property var accountFilterOptions: Model.accountFilterOptions(service.accounts)
 
+  readonly property var accountDropdownOptions: {
+    var options = accountFilterOptions
+    var out = []
+    for (var i = 0; i < options.length; i++) {
+      var count = accountUnreadCount(options[i].value)
+      out.push({
+        value: options[i].value,
+        label: count > 0 ? options[i].label + " (" + count + ")" : options[i].label
+      })
+    }
+    return out
+  }
+
+  readonly property bool otherAccountsUnread: {
+    if (accountFilter === "") return false
+    for (var i = 0; i < service.notifications.length; i++) {
+      var item = service.notifications[i]
+      if (item.unread === true && String(item.accountId || "") !== accountFilter) return true
+    }
+    return false
+  }
+
   function ensureAccountFilter() {
     if (accountFilter === "") return
     for (var i = 0; i < service.accounts.length; i++) {
@@ -201,6 +223,7 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: accountDropdown.popupOpen
       onMoveRequested: function(dx, dy) {
         if (dx !== 0) root.cycleAccountFilter(dx)
         else if (dy !== 0) root.moveSelection(dy)
@@ -322,53 +345,33 @@ Panel {
               font.pixelSize: Style.font.caption
               font.weight: Font.DemiBold
               Layout.preferredWidth: Style.space(48)
-              Layout.alignment: Qt.AlignTop
-              Layout.topMargin: Style.space(8)
             }
 
-            Flow {
+            Dropdown {
+              id: accountDropdown
               Layout.fillWidth: true
-              Layout.preferredHeight: childrenRect.height
-              spacing: Style.spacing.md
+              showLabel: false
+              options: root.accountDropdownOptions
+              foreground: root.foreground
+              background: Color.popups.background
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              onChanged: function(value) { root.setAccountFilter(value) }
 
-              Repeater {
-                model: root.accountFilterOptions
+              // Binding element (not an inline binding) so it survives the
+              // imperative `value` write Dropdown makes on selection.
+              Binding on value {
+                value: root.accountFilter
+              }
 
-                delegate: Button {
-                  required property var modelData
-                  readonly property int unreadCount: root.accountUnreadCount(modelData.value)
-
-                  text: String(modelData.label || modelData.value || "")
-                  selected: String(modelData.value || "") === root.accountFilter
-                  bordered: true
-                  foreground: root.foreground
-                  background: Color.popups.background
-                  accent: Color.accent
-                  fontFamily: root.fontFamily
-                  fontSize: Style.font.bodySmall
-                  onClicked: root.setAccountFilter(modelData.value)
-
-                  Rectangle {
-                    id: unreadBadge
-                    visible: parent.unreadCount > 0
-                    x: parent.width - width / 2
-                    y: -height / 2
-                    height: Style.space(16)
-                    width: Math.max(height, unreadBadgeText.implicitWidth + Style.space(8))
-                    radius: height / 2
-                    color: root.urgent
-
-                    Text {
-                      id: unreadBadgeText
-                      anchors.centerIn: parent
-                      text: String(parent.parent.unreadCount)
-                      color: Color.background
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.bold: true
-                    }
-                  }
-                }
+              Rectangle {
+                visible: root.accountFilter !== "" && root.otherAccountsUnread
+                x: parent.width - width / 2
+                y: -height / 2
+                width: Style.space(8)
+                height: width
+                radius: width / 2
+                color: root.urgent
               }
             }
           }
