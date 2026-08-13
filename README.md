@@ -30,7 +30,7 @@ omarchy pkg add basecamp-cli
 Authenticate and confirm that the CLI can see your accounts:
 
 ```bash
-basecamp auth login
+basecamp auth login --scope full
 basecamp accounts list
 basecamp notifications list
 ```
@@ -39,7 +39,7 @@ The plugin uses the CLI's existing credential store. It does not read, copy, or 
 
 ## Installation
 
-After this repository is published on GitHub, install and enable it with:
+Install and enable the plugin with:
 
 ```bash
 omarchy plugin add https://github.com/basecamp/omarchy-basecamp-plugin.git --enable
@@ -50,7 +50,7 @@ Choose the right bar section if Omarchy asks for a placement. The plugin manifes
 For a local checkout, pass its path instead:
 
 ```bash
-omarchy plugin add ~/Work/omarchy-basecamp-plugin --enable
+omarchy plugin add ~/code/basecamp/omarchy-basecamp-plugin --enable
 ```
 
 If the plugin ID is already installed, remove the existing copy first or use a separate test user. Omarchy will not overwrite an installed plugin.
