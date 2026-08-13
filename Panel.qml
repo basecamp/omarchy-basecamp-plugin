@@ -311,6 +311,7 @@ Panel {
           }
 
           RowLayout {
+            visible: service.accountCount > 1
             width: parent.width
             spacing: Style.space(10)
 
