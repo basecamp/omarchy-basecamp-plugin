@@ -120,12 +120,13 @@ function filterNotifications(items, accountId, state) {
   return source.filter(function(item) {
     if (selectedAccount !== "" && String(item.accountId || "") !== selectedAccount) return false
     if (selectedState === "unread") return item.unread === true
+    if (selectedState === "previous") return item.unread !== true
     return true
   })
 }
 
 function accountFilterOptions(accounts) {
-  var options = [{ value: "", label: "All" }]
+  var options = [{ value: "", label: "All accounts" }]
   var source = Array.isArray(accounts) ? accounts.slice() : []
   source.sort(function(a, b) {
     return cleanText(a.name || "Basecamp").toLowerCase().localeCompare(
