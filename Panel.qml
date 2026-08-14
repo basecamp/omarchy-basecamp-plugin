@@ -95,6 +95,32 @@ Panel {
     return "No previous notifications."
   }
 
+  // Named hues from the active theme's colors.toml (the shell's Color
+  // singleton only exposes the semantic subset, not the full palette).
+  property var themeColors: ({})
+
+  function themeHue(names, fallback) {
+    for (var i = 0; i < names.length; i++) {
+      var value = themeColors[names[i]]
+      if (value) return value
+    }
+    return fallback
+  }
+
+  function typeColor(type) {
+    var value = String(type || "").toLowerCase()
+    if (value === "mention") return themeHue(["red", "color1"], urgent)
+    if (value === "comment") return themeHue(["blue", "color4"], Color.accent)
+    if (value === "chat") return themeHue(["cyan", "color6"], Color.accent)
+    if (value === "completion") return themeHue(["green", "color2"], Color.accent)
+    if (value === "event") return themeHue(["yellow", "color3"], Color.accent)
+    if (value === "bulletin") return themeHue(["orange", "bright_red", "color9"], urgent)
+    if (value === "document") return themeHue(["brown", "muted", "color8"], Color.muted)
+    if (value === "hill") return themeHue(["bright_blue", "color12"], Color.accent)
+    if (value === "boostreport") return themeHue(["magenta", "color5"], Color.accent)
+    return Color.muted
+  }
+
   function accountUnreadCount(accountId) {
     var id = String(accountId || "")
     if (id === "") return 0
@@ -214,6 +240,14 @@ Panel {
         heroStatus.opacity = 1.0
       }
     }
+  }
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/colors.toml"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.themeColors = Model.parseThemeColors(text())
+    onFileChanged: reload()
   }
 
   IpcHandler {
@@ -486,17 +520,34 @@ Panel {
                   anchors.rightMargin: Style.space(10)
                   spacing: Style.space(9)
 
-                  Item {
-                    Layout.preferredWidth: Style.space(18)
-                    Layout.preferredHeight: Style.space(20)
+                  Rectangle {
+                    Layout.preferredWidth: Style.space(24)
+                    Layout.preferredHeight: Style.space(24)
                     Layout.alignment: Qt.AlignTop
+                    radius: width / 2
+                    color: root.typeColor(notificationRow.modelData.type)
+
+                    // Center the glyph's painted ink, not its em box — icon
+                    // glyphs sit off-center in the monospace cell (see the
+                    // kit's OpticalGlyph, extended here to both axes since a
+                    // badge has no shared baseline to preserve).
+                    TextMetrics {
+                      id: glyphMetrics
+                      font.family: root.fontFamily
+                      font.pixelSize: Math.round(Style.font.icon)
+                      text: Model.notificationTypeIcon(notificationRow.modelData.type)
+                    }
 
                     Text {
+                      id: glyphText
                       anchors.centerIn: parent
-                      text: Model.notificationTypeIcon(notificationRow.modelData.type)
-                      color: notificationRow.modelData.unread ? root.urgent : root.dim
+                      anchors.horizontalCenterOffset: glyphText.implicitWidth / 2 - (glyphMetrics.tightBoundingRect.x + glyphMetrics.tightBoundingRect.width / 2)
+                      anchors.verticalCenterOffset: glyphText.implicitHeight / 2 - (glyphText.baselineOffset + glyphMetrics.tightBoundingRect.y + glyphMetrics.tightBoundingRect.height / 2)
+                      text: glyphMetrics.text
+                      color: Color.popups.background
                       font.family: root.fontFamily
-                      font.pixelSize: Style.font.icon
+                      font.pixelSize: glyphMetrics.font.pixelSize
+                      renderType: Text.NativeRendering
                     }
                   }
 
