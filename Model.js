@@ -71,6 +71,22 @@ function parseNotifications(raw, account, limit) {
   return { ok: true, error: "", items: items }
 }
 
+function joinNames(names) {
+  if (names.length <= 1) return names.join("")
+  return names.slice(0, -1).join(", ") + " & " + names[names.length - 1]
+}
+
+function pingTitle(item) {
+  var names = []
+  var list = Array.isArray(item.participants) ? item.participants : []
+  for (var i = 0; i < list.length; i++) {
+    var name = cleanText(list[i] && list[i].name ? list[i].name : "")
+    if (name !== "") names.push(name)
+  }
+  if (names.length === 0) return ""
+  return "Ping with " + joinNames(names)
+}
+
 function normalizeNotification(value, account, unread) {
   var item = value || {}
   var id = String(item.id || "").trim()
@@ -80,19 +96,26 @@ function normalizeNotification(value, account, unread) {
   var parsedTime = Date.parse(timestamp)
   if (!isFinite(parsedTime)) parsedTime = 0
 
+  var title = cleanText(item.title || item.readable_identifier || "Basecamp notification")
+  if (String(item.section || "") === "pings" && item.named !== true) {
+    title = pingTitle(item) || title
+  }
+
   return {
     id: id,
     accountId: String(account.id || ""),
     accountName: cleanText(account.name || "Basecamp"),
     accountOrder: Number(account.order || 0),
-    title: cleanText(item.title || item.readable_identifier || "Basecamp notification"),
+    title: title,
+    creator: cleanText(item.creator && item.creator.name ? item.creator.name : ""),
     excerpt: cleanText(item.content_excerpt || ""),
     project: cleanText(item.bucket_name || item.section || ""),
     type: cleanText(item.type || ""),
     timestamp: timestamp,
     timestampMs: parsedTime,
     url: String(item.app_url || ""),
-    unread: unread === true
+    unread: unread === true,
+    unreadCount: positiveInteger(item.unread_count, 0)
   }
 }
 
@@ -140,16 +163,26 @@ function accountFilterOptions(accounts) {
 
 function notificationTypeIcon(type) {
   var value = String(type || "").toLowerCase()
-  if (value === "mention") return "󰌻"
-  if (value === "comment") return "󰆉"
-  if (value === "chat") return "󰭹"
-  if (value === "completion") return "󰄬"
-  if (value === "event") return "󰃭"
-  if (value === "bulletin") return "󰀦"
-  if (value === "document") return "󰈙"
-  if (value === "hill") return "󰔐"
-  if (value === "boostreport") return "󰓎"
-  return "󰍡"
+  if (value === "mention") return "󰁥"      // md-at
+  if (value === "comment") return "󰆉"      // md-comment_text_outline
+  if (value === "chat") return "󰭹"         // md-chat
+  if (value === "completion") return "󰄬"   // md-check
+  if (value === "event") return "󰂚"        // md-bell
+  if (value === "bulletin") return "󰃦"     // md-bullhorn
+  if (value === "document") return "󰈙"     // md-file_document
+  if (value === "hill") return "󰱐"         // md-chart_bell_curve
+  if (value === "boostreport") return "󰑣"  // md-rocket
+  return "󰍡"                               // md-message
+}
+
+function parseThemeColors(raw) {
+  var lines = String(raw || "").split("\n")
+  var colors = {}
+  for (var i = 0; i < lines.length; i++) {
+    var match = lines[i].match(/^\s*([A-Za-z0-9_-]+)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
+    if (match) colors[match[1]] = match[2]
+  }
+  return colors
 }
 
 function cleanText(value) {
@@ -172,33 +205,40 @@ function positiveInteger(value, fallback) {
   return isFinite(number) && number > 0 ? number : fallback
 }
 
-function relativeTime(timestampMs, nowMs) {
+var MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+function notificationTime(timestampMs, nowMs) {
   var value = Number(timestampMs || 0)
   if (!isFinite(value) || value <= 0) return ""
   var now = nowMs === undefined ? Date.now() : Number(nowMs)
-  var seconds = Math.max(0, Math.floor((now - value) / 1000))
-  if (seconds < 60) return "Just now"
-  var minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return minutes + "m ago"
-  var hours = Math.floor(minutes / 60)
-  if (hours < 24) return hours + "h ago"
-  var days = Math.floor(hours / 24)
-  if (days < 30) return days + "d ago"
-  var months = Math.floor(days / 30)
-  if (months < 12) return months + "mo ago"
-  return Math.floor(days / 365) + "y ago"
+  var date = new Date(value)
+  var ref = new Date(now)
+  if (date.getFullYear() === ref.getFullYear() && date.getMonth() === ref.getMonth() && date.getDate() === ref.getDate()) {
+    var hours = date.getHours()
+    var hour12 = hours % 12 === 0 ? 12 : hours % 12
+    var minutes = date.getMinutes()
+    return hour12 + ":" + (minutes < 10 ? "0" + minutes : minutes) + (hours >= 12 ? "pm" : "am")
+  }
+  var label = MONTH_NAMES[date.getMonth()] + " " + date.getDate()
+  if (date.getFullYear() !== ref.getFullYear()) label += ", " + date.getFullYear()
+  return label
 }
 
-function notificationMeta(item, nowMs) {
+function notificationMeta(item, nowMs, showAccount) {
   if (!item) return ""
   var parts = []
-  var account = cleanText(item.accountName || "")
+  var age = notificationTime(item.timestampMs, nowMs)
+  var creator = cleanText(item.creator || "")
   var project = cleanText(item.project || "")
-  var age = relativeTime(item.timestampMs, nowMs)
-  if (account !== "") parts.push(account)
-  if (project !== "") parts.push(project)
+  var account = cleanText(item.accountName || "")
   if (age !== "") parts.push(age)
-  return parts.join(" · ")
+  if (creator !== "") parts.push(creator)
+  if (project !== "") {
+    parts.push(showAccount === true && account !== "" ? project + " (" + account + ")" : project)
+  } else if (showAccount === true && account !== "") {
+    parts.push(account)
+  }
+  return parts.join(" • ")
 }
 
 if (typeof module !== "undefined") {
@@ -209,8 +249,9 @@ if (typeof module !== "undefined") {
     filterNotifications: filterNotifications,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
+    parseThemeColors: parseThemeColors,
     cleanText: cleanText,
-    relativeTime: relativeTime,
+    notificationTime: notificationTime,
     notificationMeta: notificationMeta
   }
 }
