@@ -140,6 +140,7 @@ Item {
     _readQueue = queue
     _readOutput = ""
     _readError = ""
+    actionStatusTimer.stop()
     actionStatus = "Marking notification as read…"
     readProcess.command = [
       "basecamp", "notifications", "read",
@@ -148,6 +149,19 @@ Item {
       "--json"
     ]
     readProcess.running = true
+  }
+
+  function finishRead(exitCode, stdout, stderr) {
+    if (exitCode !== 0) {
+      lastError = conciseError(stderr || stdout, "Could not mark the notification as read")
+      actionStatus = lastError
+    } else {
+      actionStatus = "Marked as read"
+    }
+    actionStatusTimer.restart()
+    _readingNotification = null
+    if (_readQueue.length > 0) runNextRead()
+    else refreshAfterRead.restart()
   }
 
   Timer {
@@ -255,16 +269,7 @@ Item {
     onExited: function(exitCode) {
       var stdout = String(readStdout.text || root._readOutput || "")
       var stderr = String(readStderr.text || root._readError || "")
-      if (exitCode !== 0) {
-        root.lastError = root.conciseError(stderr || stdout, "Could not mark the notification as read")
-        root.actionStatus = root.lastError
-      } else {
-        root.actionStatus = "Marked as read"
-      }
-      root.actionStatusTimer.restart()
-      root._readingNotification = null
-      if (root._readQueue.length > 0) root.runNextRead()
-      else root.refreshAfterRead.restart()
+      root.finishRead(exitCode, stdout, stderr)
     }
   }
 }
