@@ -77,7 +77,11 @@ Panel {
   function resetFilteredView() {
     selectedIndex = 0
     cursorActive = false
+    pointerGate.reset()
     if (panelFlick) panelFlick.contentY = 0
+    Qt.callLater(function() {
+      if (panelFlick) panelFlick.contentY = 0
+    })
   }
 
   function setAccountFilter(value) {
@@ -202,6 +206,11 @@ Panel {
   }
 
   onFilteredNotificationsChanged: ensureSelection()
+
+  PointerMoveGate {
+    id: pointerGate
+    referenceItem: panelFlick
+  }
 
   Service {
     id: service
@@ -501,7 +510,9 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onEntered: root.select(notificationRow.index)
+                  onPositionChanged: function(mouse) {
+                    if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
+                  }
                   onClicked: service.openNotification(notificationRow.modelData)
                 }
 
