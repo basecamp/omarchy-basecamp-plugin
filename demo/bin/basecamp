@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import sys
+import tempfile
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
+def fail(message, exit_code=2):
+    print(json.dumps({"ok": False, "error": message}), file=sys.stderr)
+    raise SystemExit(exit_code)
+
+
+def option(args, name):
+    try:
+        return args[args.index(name) + 1]
+    except (ValueError, IndexError):
+        fail(f"Missing required option: {name}")
+
+
+def load_fixture():
+    default = Path(__file__).resolve().parent.parent / "fixtures" / "screenshot.json"
+    path = Path(os.environ.get("BASECAMP_DEMO_FIXTURE", default))
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"Could not load demo fixture {path}: {error}")
+
+
+def state_path():
+    default_dir = Path(tempfile.gettempdir()) / f"omarchy-basecamp-demo-{os.getuid()}"
+    directory = Path(os.environ.get("BASECAMP_DEMO_STATE_DIR", default_dir))
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / "state.json"
+
+
+def load_state():
+    path = state_path()
+    if not path.exists():
+        return {"read_ids": []}
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"Could not load demo state: {error}")
+
+
+def save_state(state):
+    path = state_path()
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(state))
+    temporary.replace(path)
+
+
+def account_by_id(fixture, account_id):
+    for account in fixture["accounts"]:
+        if str(account["id"]) == str(account_id):
+            return account
+    fail(f"Unknown demo account: {account_id}")
+
+
+def notification_by_id(fixture, account_id, notification_id):
+    account_by_id(fixture, account_id)
+    for notification in fixture["notifications"]:
+        if (str(notification["account_id"]) == str(account_id)
+                and str(notification["id"]) == str(notification_id)):
+            return notification
+    fail(f"Unknown demo notification: {notification_id}")
+
+
+def rendered_notification(source, read, now):
+    notification = deepcopy(source)
+    minutes_ago = int(notification.pop("minutes_ago"))
+    notification.pop("account_id", None)
+    notification.pop("state", None)
+
+    timestamp = now - timedelta(minutes=minutes_ago)
+    formatted = timestamp.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    notification["created_at"] = formatted
+    notification["updated_at"] = formatted
+    notification["app_url"] = ""
+    if read:
+        notification["read_at"] = formatted
+    else:
+        notification["unread_at"] = formatted
+    return notification
+
+
+def list_accounts(fixture):
+    print(json.dumps({"ok": True, "data": fixture["accounts"]}))
+
+
+def list_notifications(fixture, args):
+    account_id = option(args, "--account")
+    account_by_id(fixture, account_id)
+    read_ids = {str(value) for value in load_state().get("read_ids", [])}
+    now = datetime.now(timezone.utc)
+    unreads = []
+    reads = []
+
+    for source in fixture["notifications"]:
+        if str(source["account_id"]) != str(account_id):
+            continue
+        read_key = f"{account_id}:{source['id']}"
+        read = source.get("state") == "read" or read_key in read_ids
+        rendered = rendered_notification(source, read, now)
+        (reads if read else unreads).append(rendered)
+
+    key = lambda item: item["updated_at"]
+    unreads.sort(key=key, reverse=True)
+    reads.sort(key=key, reverse=True)
+    print(json.dumps({
+        "ok": True,
+        "data": {
+            "bubble_ups_count": 0,
+            "unreads": unreads,
+            "reads": reads
+        }
+    }))
+
+
+def mark_notification_read(fixture, args):
+    if len(args) < 3:
+        fail("Missing notification id")
+    notification_id = args[2]
+    account_id = option(args, "--account")
+    notification_by_id(fixture, account_id, notification_id)
+
+    state = load_state()
+    read_ids = {str(value) for value in state.get("read_ids", [])}
+    read_ids.add(f"{account_id}:{notification_id}")
+    state["read_ids"] = sorted(read_ids)
+    save_state(state)
+    print(json.dumps({"ok": True, "data": {"id": notification_id}}))
+
+
+def main():
+    fixture = load_fixture()
+    args = sys.argv[1:]
+
+    if args == ["accounts", "list", "--json"]:
+        list_accounts(fixture)
+    elif (len(args) == 5 and args[:2] == ["notifications", "list"]
+          and args[2] == "--account" and args[4] == "--json"):
+        list_notifications(fixture, args)
+    elif (len(args) == 6 and args[:2] == ["notifications", "read"]
+          and args[3] == "--account" and args[5] == "--json"):
+        mark_notification_read(fixture, args)
+    else:
+        fail("Unsupported demo Basecamp CLI command: " + " ".join(args))
+
+
+if __name__ == "__main__":
+    main()

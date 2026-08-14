@@ -1,0 +1,156 @@
+{
+  "accounts": [
+    { "id": 1001, "name": "Acme Design Co." },
+    { "id": 1002, "name": "Northstar Labs" },
+    { "id": 1003, "name": "Good Day Studio" }
+  ],
+  "notifications": [
+    {
+      "id": 501,
+      "account_id": 1001,
+      "state": "unread",
+      "minutes_ago": 2,
+      "type": "Chat",
+      "title": "Chat",
+      "content_excerpt": "The new homepage direction is ready for everyone to review.",
+      "bucket_name": "Website refresh",
+      "creator": { "name": "Maya Chen" },
+      "unread_count": 3
+    },
+    {
+      "id": 502,
+      "account_id": 1002,
+      "state": "unread",
+      "minutes_ago": 6,
+      "type": "Mention",
+      "title": "@mentioned you: Can you review the launch plan before tomorrow’s kickoff?",
+      "content_excerpt": "I pulled the open questions together and highlighted the decisions we need to make.",
+      "bucket_name": "Fall launch",
+      "creator": { "name": "Noah Williams" },
+      "unread_count": 1
+    },
+    {
+      "id": 503,
+      "account_id": 1003,
+      "state": "unread",
+      "minutes_ago": 11,
+      "type": "Chat",
+      "section": "pings",
+      "title": "Project check-in",
+      "content_excerpt": "The first round looks great. Let’s talk through the final details.",
+      "bucket_name": "Studio team",
+      "creator": { "name": "Avery Brooks" },
+      "participants": [
+        { "name": "Avery Brooks" },
+        { "name": "Jordan Lee" }
+      ],
+      "unread_count": 1
+    },
+    {
+      "id": 504,
+      "account_id": 1001,
+      "state": "unread",
+      "minutes_ago": 17,
+      "type": "Completion",
+      "title": "Completed: Prepare the launch checklist",
+      "content_excerpt": "Every launch task now has an owner and a due date.",
+      "bucket_name": "Product launch",
+      "creator": { "name": "Sofia Patel" },
+      "unread_count": 1
+    },
+    {
+      "id": 505,
+      "account_id": 1002,
+      "state": "unread",
+      "minutes_ago": 24,
+      "type": "Comment",
+      "title": "Re: Q3 product roadmap",
+      "content_excerpt": "This sequence gives the team enough room to validate each milestone.",
+      "bucket_name": "Product planning",
+      "creator": { "name": "Eli Thompson" },
+      "unread_count": 2
+    },
+    {
+      "id": 506,
+      "account_id": 1003,
+      "state": "unread",
+      "minutes_ago": 31,
+      "type": "Event",
+      "title": "Added: Customer workshop",
+      "content_excerpt": "Wednesday at 10:00am in the workshop room.",
+      "bucket_name": "Client workshops",
+      "creator": { "name": "Jordan Lee" },
+      "unread_count": 1
+    },
+    {
+      "id": 507,
+      "account_id": 1001,
+      "state": "unread",
+      "minutes_ago": 43,
+      "type": "Bulletin",
+      "title": "Announcing the fall release",
+      "content_excerpt": "Here’s what is shipping and how we’ll introduce it to customers.",
+      "bucket_name": "Company HQ",
+      "creator": { "name": "Maya Chen" },
+      "unread_count": 1
+    },
+    {
+      "id": 508,
+      "account_id": 1002,
+      "state": "unread",
+      "minutes_ago": 58,
+      "type": "Document",
+      "title": "Updated: Brand voice guidelines",
+      "content_excerpt": "New examples cover product announcements, support replies, and release notes.",
+      "bucket_name": "Brand system",
+      "creator": { "name": "Noah Williams" },
+      "unread_count": 1
+    },
+    {
+      "id": 509,
+      "account_id": 1003,
+      "state": "unread",
+      "minutes_ago": 76,
+      "type": "Hill",
+      "title": "The onboarding refresh moved uphill",
+      "content_excerpt": "The team has resolved the main interaction questions.",
+      "bucket_name": "Onboarding refresh",
+      "creator": { "name": "Avery Brooks" },
+      "unread_count": 1
+    },
+    {
+      "id": 510,
+      "account_id": 1001,
+      "state": "unread",
+      "minutes_ago": 104,
+      "type": "BoostReport",
+      "title": "You’ve got boosts!",
+      "content_excerpt": "Nice work simplifying the new account setup.",
+      "bucket_name": "Customer experience",
+      "creator": { "name": "Sofia Patel" },
+      "unread_count": 4
+    },
+    {
+      "id": 511,
+      "account_id": 1002,
+      "state": "read",
+      "minutes_ago": 190,
+      "type": "Comment",
+      "title": "Re: Weekly planning notes",
+      "content_excerpt": "Everything from today’s discussion is captured here.",
+      "bucket_name": "Team planning",
+      "creator": { "name": "Eli Thompson" }
+    },
+    {
+      "id": 512,
+      "account_id": 1003,
+      "state": "read",
+      "minutes_ago": 330,
+      "type": "Document",
+      "title": "Shared: Research summary",
+      "content_excerpt": "A concise summary of the customer interviews and recurring themes.",
+      "bucket_name": "Customer research",
+      "creator": { "name": "Jordan Lee" }
+    }
+  ]
+}
