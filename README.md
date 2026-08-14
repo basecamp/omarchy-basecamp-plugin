@@ -66,6 +66,38 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Use the left and right arrow keys to move through account filters.
 - Press `U` for unread notifications, `A` for all notifications, or `R` to refresh.
 
+## Development
+
+Run the model, demo-contract, and QML service tests with:
+
+```bash
+./tests/run
+```
+
+### Demo data
+
+Launch the current checkout with fictional accounts and notifications:
+
+```bash
+./demo/run
+```
+
+The demo uses an empty workspace and temporarily shows only the Basecamp widget on the right side of the bar. Press `Ctrl+C` to restore the normal shell, plugin installation, bar layout, and previous workspace.
+
+Create a clean screenshot cropped to the top bar and open panel with:
+
+```bash
+./demo/run --screenshot
+```
+
+The screenshot is saved in `~/Pictures`. Choose a destination explicitly when useful:
+
+```bash
+./demo/run --screenshot --output /tmp/basecamp-demo.png
+```
+
+Demo mode runs the plugin against `demo/bin/basecamp`, which implements the same CLI commands used in production. It never reads Basecamp credentials or contacts Basecamp. Mark-as-read actions are kept in temporary session state and disappear when the demo exits.
+
 ## Updates
 
 Git-managed installations can be updated with:
