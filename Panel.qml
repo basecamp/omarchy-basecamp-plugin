@@ -498,16 +498,6 @@ Panel {
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.icon
                     }
-
-                    Rectangle {
-                      visible: notificationRow.modelData.unread
-                      anchors.top: parent.top
-                      anchors.right: parent.right
-                      width: Style.space(4)
-                      height: width
-                      radius: width / 2
-                      color: root.urgent
-                    }
                   }
 
                   ColumnLayout {
@@ -538,11 +528,31 @@ Panel {
 
                     Text {
                       Layout.fillWidth: true
-                      text: Model.notificationMeta(notificationRow.modelData, root.nowMs)
+                      text: Model.notificationMeta(notificationRow.modelData, root.nowMs, root.accountFilter === "")
                       color: root.dim
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                       elide: Text.ElideRight
+                    }
+                  }
+
+                  Rectangle {
+                    visible: notificationRow.modelData.unread
+                    Layout.alignment: Qt.AlignTop
+                    Layout.topMargin: Style.space(2)
+                    Layout.preferredHeight: Style.space(16)
+                    Layout.preferredWidth: Math.max(Style.space(16), rowBadgeText.implicitWidth + Style.space(8))
+                    radius: Style.space(8)
+                    color: root.urgent
+
+                    Text {
+                      id: rowBadgeText
+                      anchors.centerIn: parent
+                      text: String(Math.max(1, notificationRow.modelData.unreadCount || 0))
+                      color: Color.background
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
                     }
                   }
                 }
