@@ -99,6 +99,9 @@ Panel {
     return "No previous notifications."
   }
 
+  readonly property bool needsSetup: service.probed && (!service.installed || !service.authenticated)
+  readonly property string setupCommand: service.installed ? "basecamp auth login" : "omarchy pkg add basecamp-cli"
+
   function typeColor(type) {
     var value = String(type || "").toLowerCase()
     if (value === "mention") return urgent
@@ -376,7 +379,7 @@ Panel {
 
           Dropdown {
             id: accountDropdown
-            visible: service.accountCount > 1
+            visible: service.accountCount > 1 && !root.needsSetup
             width: parent.width
             showLabel: false
             options: root.accountDropdownOptions
@@ -404,6 +407,7 @@ Panel {
           }
 
           Row {
+            visible: !root.needsSetup
             spacing: Style.space(2)
 
             Button {
@@ -451,8 +455,84 @@ Panel {
             width: panelFlick.width
             spacing: Style.space(12)
 
+            Column {
+              visible: root.needsSetup
+              width: parent.width
+              spacing: Style.space(8)
+              topPadding: Style.space(16)
+              bottomPadding: Style.space(18)
+
+              Text {
+                width: parent.width
+                text: service.installed ? "Please sign in" : "Basecamp CLI is required"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+              }
+
+              Item {
+                width: parent.width
+                implicitHeight: setupCommandRow.implicitHeight + Style.space(4)
+
+                Row {
+                  id: setupCommandRow
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  spacing: Style.space(6)
+
+                  Text {
+                    text: root.setupCommand
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                  }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "󰆏"
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+                }
+
+                MouseArea {
+                  id: setupCommandMouse
+                  anchors.fill: setupCommandRow
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    Quickshell.execDetached(["bash", "-c", "printf %s " + Util.shellQuote(root.setupCommand) + " | wl-copy"])
+                    setupCopiedTimer.restart()
+                  }
+                }
+
+                PanelToolTip {
+                  visible: setupCommandMouse.containsMouse
+                  text: setupCopiedTimer.running ? "Copied" : "Copy to clipboard"
+                  fontFamily: root.fontFamily
+                }
+
+                Timer {
+                  id: setupCopiedTimer
+                  interval: 1500
+                }
+              }
+
+              Text {
+                width: parent.width
+                text: service.installed ? "After you authenticate, press R to retry." : "Press R to retry after install completes."
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                horizontalAlignment: Text.AlignHCenter
+              }
+            }
+
             Text {
-              visible: !service.refreshing && root.filteredNotifications.length === 0 && service.lastError === ""
+              visible: !root.needsSetup && !service.refreshing && root.filteredNotifications.length === 0 && service.lastError === ""
             width: parent.width
             text: root.emptyMessage()
             color: root.dim
@@ -465,7 +545,7 @@ Panel {
 
           Column {
             id: notificationColumn
-            visible: root.filteredNotifications.length > 0
+            visible: !root.needsSetup && root.filteredNotifications.length > 0
             width: parent.width
             spacing: Style.space(8)
 

@@ -9,6 +9,8 @@ Item {
   property var settings: ({})
   property bool refreshing: false
   property bool installed: true
+  property bool authenticated: true
+  property bool probed: false
   property var accounts: []
   property var notifications: []
   property int unreadCount: 0
@@ -20,6 +22,7 @@ Item {
   readonly property int maxPerAccount: intSetting("maxPerAccount", 20, 5, 50)
   readonly property int accountCount: accounts.length
 
+  property string _probeOutput: ""
   property string _accountsOutput: ""
   property string _accountsError: ""
   property var _fetchAccounts: []
@@ -56,15 +59,44 @@ Item {
   }
 
   function refresh() {
-    if (refreshing || accountsProcess.running || notificationProcess.running) return
+    if (refreshing || probeProcess.running || accountsProcess.running || notificationProcess.running) return
     refreshing = true
-    installed = true
     lastError = ""
     _partialErrors = []
+    // Probe on every refresh: a bare `basecamp` process would never emit
+    // `exited` if the binary vanished since the last check, sticking
+    // `refreshing` forever. The probe's bash wrapper always exits.
+    _probeOutput = ""
+    probeProcess.running = true
+  }
+
+  function fetchAccounts() {
     _accountsOutput = ""
     _accountsError = ""
     accountsProcess.command = ["basecamp", "accounts", "list", "--json"]
     accountsProcess.running = true
+  }
+
+  function finishProbe(stdout) {
+    probed = true
+    if (stdout.trim() === "missing") {
+      installed = false
+      refreshing = false
+      return
+    }
+    installed = true
+    // Only a well-formed `auth status` success is authoritative for the
+    // authenticated flag. Errors and garbage get the error line instead —
+    // telling the user to log in can't fix those.
+    var result = Model.parseJson(stdout)
+    if (!result.ok || !result.value.data) {
+      lastError = conciseError("Could not check the Basecamp CLI: " + (result.error || "unexpected response"))
+      refreshing = false
+      return
+    }
+    authenticated = result.value.data.authenticated === true
+    if (authenticated) fetchAccounts()
+    else refreshing = false
   }
 
   function beginNotificationFetch(nextAccounts) {
@@ -188,6 +220,22 @@ Item {
   }
 
   Process {
+    id: probeProcess
+    running: false
+    // bash always exists, so `exited` always fires — a bare `basecamp`
+    // command would silently never exit when the binary is missing.
+    command: ["bash", "-c", "command -v basecamp >/dev/null 2>&1 || { echo missing; exit 0; }; basecamp auth status --json"]
+    stdout: StdioCollector {
+      id: probeStdout
+      waitForEnd: true
+      onStreamFinished: root._probeOutput = text
+    }
+    onExited: function(exitCode) {
+      root.finishProbe(String(probeStdout.text || root._probeOutput || ""))
+    }
+  }
+
+  Process {
     id: accountsProcess
     running: false
     command: []
@@ -205,8 +253,12 @@ Item {
       var stdout = String(accountsStdout.text || root._accountsOutput || "")
       var stderr = String(accountsStderr.text || root._accountsError || "")
       if (exitCode !== 0) {
-        root.installed = exitCode !== 127
-        root.lastError = root.conciseError(stderr || stdout, root.installed ? "Could not list Basecamp accounts" : "Basecamp CLI is not installed")
+        if (Model.parseJson(stdout).code === "auth_required") {
+          root.authenticated = false
+          root.refreshing = false
+          return
+        }
+        root.lastError = root.conciseError(stderr || stdout, "Could not list Basecamp accounts")
         root.refreshing = false
         return
       }
@@ -244,6 +296,12 @@ Item {
         var parsed = Model.parseNotifications(stdout, account, root.maxPerAccount)
         if (parsed.ok) root._fetchedNotifications = root._fetchedNotifications.concat(parsed.items)
         else root._partialErrors.push(account.name + ": " + parsed.error)
+      } else if (Model.parseJson(stdout).code === "auth_required") {
+        // Shared credentials: every remaining account would fail the same
+        // way, so stop the refresh instead of finishing as if it completed.
+        root.authenticated = false
+        root.refreshing = false
+        return
       } else {
         root._partialErrors.push(account.name + ": " + root.conciseError(stderr || stdout, "request failed"))
       }
