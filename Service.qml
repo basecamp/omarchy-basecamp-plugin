@@ -85,15 +85,17 @@ Item {
       return
     }
     installed = true
-    var authed = false
-    try {
-      var parsed = JSON.parse(stdout)
-      authed = parsed && parsed.data && parsed.data.authenticated === true
-    } catch (error) {
-      authed = false
+    // Only a well-formed `auth status` success is authoritative for the
+    // authenticated flag. Errors and garbage get the error line instead —
+    // telling the user to log in can't fix those.
+    var result = Model.parseJson(stdout)
+    if (!result.ok || !result.value.data) {
+      lastError = conciseError("Could not check the Basecamp CLI: " + (result.error || "unexpected response"))
+      refreshing = false
+      return
     }
-    authenticated = authed
-    if (authed) fetchAccounts()
+    authenticated = result.value.data.authenticated === true
+    if (authenticated) fetchAccounts()
     else refreshing = false
   }
 
@@ -295,7 +297,11 @@ Item {
         if (parsed.ok) root._fetchedNotifications = root._fetchedNotifications.concat(parsed.items)
         else root._partialErrors.push(account.name + ": " + parsed.error)
       } else if (Model.parseJson(stdout).code === "auth_required") {
+        // Shared credentials: every remaining account would fail the same
+        // way, so stop the refresh instead of finishing as if it completed.
         root.authenticated = false
+        root.refreshing = false
+        return
       } else {
         root._partialErrors.push(account.name + ": " + root.conciseError(stderr || stdout, "request failed"))
       }

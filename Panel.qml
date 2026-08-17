@@ -379,7 +379,7 @@ Panel {
 
           Dropdown {
             id: accountDropdown
-            visible: service.accountCount > 1
+            visible: service.accountCount > 1 && !root.needsSetup
             width: parent.width
             showLabel: false
             options: root.accountDropdownOptions

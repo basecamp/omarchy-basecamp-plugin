@@ -52,6 +52,17 @@ TestCase {
     return null
   }
 
+  function findNotificationListProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length >= 3
+          && process.command[0] === "basecamp"
+          && process.command[1] === "notifications"
+          && process.command[2] === "list") return process
+    }
+    return null
+  }
+
   function beginRead(id) {
     var item = {
       id: String(id),
@@ -142,6 +153,42 @@ TestCase {
     compare(service.authenticated, false)
     compare(service.refreshing, false)
     compare(service.lastError, "")
+  }
+
+  function test_garbage_probe_output_reports_error_not_signin() {
+    service.refresh()
+    findProbeProcess().complete(0, "not json at all", "")
+    compare(service.probed, true)
+    compare(service.installed, true)
+    compare(service.authenticated, true)
+    verify(service.lastError !== "")
+    compare(service.refreshing, false)
+    compare(findAccountsProcess(), null)
+  }
+
+  function test_error_envelope_probe_output_reports_error_not_signin() {
+    service.refresh()
+    findProbeProcess().complete(0, '{"ok":false,"error":"Config file is corrupt","code":"config"}', "")
+    compare(service.authenticated, true)
+    verify(service.lastError.indexOf("Config file is corrupt") !== -1)
+    compare(service.refreshing, false)
+    compare(findAccountsProcess(), null)
+  }
+
+  function test_auth_required_mid_fetch_stops_the_refresh() {
+    service.refresh()
+    findProbeProcess().complete(0, '{"ok":true,"data":{"authenticated":true}}', "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":1,"name":"One"},{"id":2,"name":"Two"}]}', "")
+
+    var notificationList = findNotificationListProcess()
+    verify(notificationList !== null)
+    verify(notificationList.running)
+    notificationList.complete(3, '{"ok":false,"error":"Not authenticated. Run: basecamp auth login","code":"auth_required"}', "")
+
+    compare(service.authenticated, false)
+    compare(service.refreshing, false)
+    verify(!notificationList.running)
+    compare(service.lastUpdated.getTime(), 0)
   }
 
   function test_retry_after_failed_probe_probes_again() {
