@@ -1,14 +1,21 @@
 function parseJson(raw) {
   var text = String(raw || "").trim()
-  if (text === "") return { ok: false, error: "The Basecamp CLI returned no data" }
+  if (text === "") return { ok: false, error: "The Basecamp CLI returned no data", code: "" }
 
   try {
     var parsed = JSON.parse(text)
-    if (!parsed || typeof parsed !== "object") return { ok: false, error: "The Basecamp CLI returned invalid data" }
-    if (parsed.ok === false) return { ok: false, error: cleanText(parsed.error || parsed.message || "The Basecamp CLI request failed") }
+    if (!parsed || typeof parsed !== "object") return { ok: false, error: "The Basecamp CLI returned invalid data", code: "" }
+    if (parsed.ok === false) {
+      return {
+        ok: false,
+        error: cleanText(parsed.error || parsed.message || "The Basecamp CLI request failed"),
+        code: String(parsed.code || ""),
+        hint: cleanText(parsed.hint || "")
+      }
+    }
     return { ok: true, value: parsed }
   } catch (error) {
-    return { ok: false, error: "Could not parse the Basecamp CLI response" }
+    return { ok: false, error: "Could not parse the Basecamp CLI response", code: "" }
   }
 }
 
