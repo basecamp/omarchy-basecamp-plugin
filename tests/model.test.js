@@ -85,15 +85,6 @@ test("filterNotifications combines account and read-state filters without reorde
   assert.deepEqual(Model.filterNotifications(items, "", "all").map(item => item.id), ["new-a", "new-b", "old-a"])
 })
 
-test("parseThemeColors reads named six-digit colors", () => {
-  assert.deepEqual(Model.parseThemeColors([
-    "mode = \"dark\"",
-    "red = \"#ff0000\"",
-    "color4=#112233",
-    "invalid = \"blue\""
-  ].join("\n")), { red: "#ff0000", color4: "#112233" })
-})
-
 test("notificationMeta includes account context only when requested", () => {
   const item = {
     timestampMs: 0,

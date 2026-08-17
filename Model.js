@@ -175,16 +175,6 @@ function notificationTypeIcon(type) {
   return "󰍡"                               // md-message
 }
 
-function parseThemeColors(raw) {
-  var lines = String(raw || "").split("\n")
-  var colors = {}
-  for (var i = 0; i < lines.length; i++) {
-    var match = lines[i].match(/^\s*([A-Za-z0-9_-]+)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
-    if (match) colors[match[1]] = match[2]
-  }
-  return colors
-}
-
 function cleanText(value) {
   return String(value || "")
     .replace(/\\[nrt]/g, " ")
@@ -249,7 +239,6 @@ if (typeof module !== "undefined") {
     filterNotifications: filterNotifications,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
-    parseThemeColors: parseThemeColors,
     cleanText: cleanText,
     notificationTime: notificationTime,
     notificationMeta: notificationMeta
