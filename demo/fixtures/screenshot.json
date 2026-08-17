@@ -152,5 +152,63 @@
       "bucket_name": "Customer research",
       "creator": { "name": "Jordan Lee" }
     }
+  ],
+  "bookmarks": [
+    {
+      "id": 601,
+      "account_id": 1001,
+      "days_ago": 9,
+      "type": "Todoset",
+      "title": "To-dos",
+      "bucket_name": "Website refresh"
+    },
+    {
+      "id": 602,
+      "account_id": 1001,
+      "days_ago": 34,
+      "type": "Inbox",
+      "title": "Email Forwards",
+      "bucket_name": "Company HQ"
+    },
+    {
+      "id": 603,
+      "account_id": 1001,
+      "days_ago": 66,
+      "type": "Schedule::Entry",
+      "title": "Weekly design review",
+      "bucket_name": "Product launch"
+    },
+    {
+      "id": 611,
+      "account_id": 1002,
+      "days_ago": 3,
+      "type": "Todo",
+      "title": "Ship the launch checklist",
+      "bucket_name": "Fall launch"
+    },
+    {
+      "id": 612,
+      "account_id": 1002,
+      "days_ago": 21,
+      "type": "Vault",
+      "title": "Docs & Files",
+      "bucket_name": "Brand system"
+    },
+    {
+      "id": 621,
+      "account_id": 1003,
+      "days_ago": 12,
+      "type": "Document",
+      "title": "Studio handbook",
+      "bucket_name": "Studio team"
+    },
+    {
+      "id": 622,
+      "account_id": 1003,
+      "days_ago": 48,
+      "type": "Todoset",
+      "title": "To-dos",
+      "bucket_name": "Onboarding refresh"
+    }
   ]
 }

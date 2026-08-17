@@ -71,6 +71,49 @@ function parseNotifications(raw, account, limit) {
   return { ok: true, error: "", items: items }
 }
 
+function parseBookmarks(raw, account) {
+  var result = parseJson(raw)
+  if (!result.ok) return { ok: false, error: result.error, items: [] }
+
+  var data = Array.isArray(result.value.data) ? result.value.data : []
+  var items = []
+  for (var i = 0; i < data.length; i++) {
+    var item = normalizeBookmark(data[i], account)
+    if (item) items.push(item)
+  }
+
+  return { ok: true, error: "", items: items }
+}
+
+function normalizeBookmark(value, account) {
+  var bookmark = value || {}
+  var id = String(bookmark.id || "").trim()
+  if (id === "") return null
+
+  // A bookmark is a pointer; without the recording there is nothing to show
+  // and nothing to open.
+  var recording = bookmark.recording
+  if (!recording || typeof recording !== "object") return null
+
+  var timestamp = String(bookmark.created_at || "")
+  var parsedTime = Date.parse(timestamp)
+  if (!isFinite(parsedTime)) parsedTime = 0
+
+  var bucket = recording.bucket || {}
+  return {
+    id: id,
+    accountId: String(account.id || ""),
+    accountName: cleanText(account.name || "Basecamp"),
+    accountOrder: Number(account.order || 0),
+    title: cleanText(recording.title || "Bookmark"),
+    project: cleanText(bucket.name || ""),
+    type: cleanText(recording.type || ""),
+    url: String(recording.app_url || ""),
+    timestamp: timestamp,
+    timestampMs: parsedTime
+  }
+}
+
 function joinNames(names) {
   if (names.length <= 1) return names.join("")
   return names.slice(0, -1).join(", ") + " & " + names[names.length - 1]
@@ -124,16 +167,33 @@ function compareWithinAccount(a, b) {
   return Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
 }
 
+function compareNewestFirst(a, b) {
+  var timeDifference = Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
+  if (timeDifference !== 0) return timeDifference
+  var accountDifference = Number(a.accountOrder || 0) - Number(b.accountOrder || 0)
+  if (accountDifference !== 0) return accountDifference
+  return String(a.id || "").localeCompare(String(b.id || ""))
+}
+
 function sortNotifications(items) {
   var sorted = Array.isArray(items) ? items.slice() : []
-  sorted.sort(function(a, b) {
-    var timeDifference = Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
-    if (timeDifference !== 0) return timeDifference
-    var accountDifference = Number(a.accountOrder || 0) - Number(b.accountOrder || 0)
-    if (accountDifference !== 0) return accountDifference
-    return String(a.id || "").localeCompare(String(b.id || ""))
-  })
+  sorted.sort(compareNewestFirst)
   return sorted
+}
+
+function sortBookmarks(items) {
+  var sorted = Array.isArray(items) ? items.slice() : []
+  sorted.sort(compareNewestFirst)
+  return sorted
+}
+
+function filterBookmarks(items, accountId) {
+  var source = Array.isArray(items) ? items : []
+  var selectedAccount = String(accountId || "")
+  if (selectedAccount === "") return source.slice()
+  return source.filter(function(item) {
+    return String(item.accountId || "") === selectedAccount
+  })
 }
 
 function filterNotifications(items, accountId, state) {
@@ -173,6 +233,32 @@ function notificationTypeIcon(type) {
   if (value === "hill") return "󰱐"         // md-chart_bell_curve
   if (value === "boostreport") return "󰑣"  // md-rocket
   return "󰍡"                               // md-message
+}
+
+// Bookmarks point at recordings, whose types are namespaced ("Schedule::Entry")
+// and name the thing itself rather than the event that touched it, so they need
+// their own map alongside notificationTypeIcon.
+function bookmarkTypeIcon(type) {
+  var value = String(type || "").toLowerCase().split("::")[0]
+  if (value === "todoset") return "󰄹"       // md-clipboard_check
+  if (value === "todolist") return "󰉹"      // md-format_list_bulleted
+  if (value === "todo") return "󰄬"          // md-check
+  if (value === "inbox") return "󰇮"         // md-email
+  if (value === "vault") return "󰉋"         // md-folder
+  if (value === "document") return "󰈙"      // md-file_document
+  if (value === "upload") return "󰕒"        // md-upload
+  if (value === "message") return "󰃦"       // md-bullhorn
+  if (value === "messageboard") return "󰃦"  // md-bullhorn
+  if (value === "comment") return "󰆉"       // md-comment_text_outline
+  if (value === "schedule") return "󰃭"      // md-calendar
+  if (value === "question") return "󰠗"      // md-comment_question_outline
+  if (value === "questionnaire") return "󰠗" // md-comment_question_outline
+  if (value === "chat") return "󰭹"          // md-chat
+  if (value === "campfire") return "󰭹"      // md-chat
+  if (value === "kanban") return "󰨗"        // md-card_text
+  if (value === "card") return "󰨗"          // md-card_text
+  if (value === "cardtable") return "󰨗"     // md-card_text
+  return "󰃃"                                // md-bookmark
 }
 
 function cleanText(value) {
@@ -231,16 +317,31 @@ function notificationMeta(item, nowMs, showAccount) {
   return parts.join(" • ")
 }
 
+function bookmarkMeta(item, nowMs, showAccount) {
+  if (!item) return ""
+  var parts = []
+  var saved = notificationTime(item.timestampMs, nowMs)
+  var account = cleanText(item.accountName || "")
+  if (saved !== "") parts.push("Saved " + saved)
+  if (showAccount === true && account !== "") parts.push(account)
+  return parts.join(" • ")
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,
+    parseBookmarks: parseBookmarks,
     sortNotifications: sortNotifications,
+    sortBookmarks: sortBookmarks,
     filterNotifications: filterNotifications,
+    filterBookmarks: filterBookmarks,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
+    bookmarkTypeIcon: bookmarkTypeIcon,
     cleanText: cleanText,
     notificationTime: notificationTime,
-    notificationMeta: notificationMeta
+    notificationMeta: notificationMeta,
+    bookmarkMeta: bookmarkMeta
   }
 }

@@ -88,8 +88,43 @@ def rendered_notification(source, read, now):
     return notification
 
 
+def rendered_bookmark(source, now):
+    bookmark = deepcopy(source)
+    days_ago = int(bookmark.pop("days_ago"))
+    bookmark.pop("account_id", None)
+
+    timestamp = now - timedelta(days=days_ago)
+    formatted = timestamp.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return {
+        "id": bookmark["id"],
+        "created_at": formatted,
+        "updated_at": formatted,
+        "recording": {
+            "id": bookmark["id"] * 100,
+            "title": bookmark["title"],
+            "type": bookmark["type"],
+            "app_url": "",
+            "bucket": {"id": 9000, "name": bookmark["bucket_name"], "type": "Project"},
+        },
+    }
+
+
 def list_accounts(fixture):
     print(json.dumps({"ok": True, "data": fixture["accounts"]}))
+
+
+def list_bookmarks(fixture, args):
+    account_id = option(args, "--account")
+    account_by_id(fixture, account_id)
+    now = datetime.now(timezone.utc)
+
+    bookmarks = [
+        rendered_bookmark(source, now)
+        for source in fixture.get("bookmarks", [])
+        if str(source["account_id"]) == str(account_id)
+    ]
+    bookmarks.sort(key=lambda bookmark: bookmark["created_at"], reverse=True)
+    print(json.dumps({"ok": True, "data": bookmarks}))
 
 
 def list_notifications(fixture, args):
@@ -145,6 +180,9 @@ def main():
     elif (len(args) == 5 and args[:2] == ["notifications", "list"]
           and args[2] == "--account" and args[4] == "--json"):
         list_notifications(fixture, args)
+    elif (len(args) == 6 and args[:3] == ["api", "get", "my/bookmarks.json"]
+          and args[3] == "--account" and args[5] == "--json"):
+        list_bookmarks(fixture, args)
     elif (len(args) == 6 and args[:2] == ["notifications", "read"]
           and args[3] == "--account" and args[5] == "--json"):
         mark_notification_read(fixture, args)

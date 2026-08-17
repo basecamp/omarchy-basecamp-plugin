@@ -23,7 +23,12 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property bool bookmarksMode: stateFilter === "bookmarks"
   readonly property var filteredNotifications: Model.filterNotifications(service.notifications, accountFilter, stateFilter)
+  readonly property var filteredBookmarks: Model.filterBookmarks(service.bookmarks, accountFilter)
+  readonly property var activeList: bookmarksMode ? filteredBookmarks : filteredNotifications
+  readonly property bool activeRefreshing: bookmarksMode ? service.bookmarksRefreshing : service.refreshing
+  readonly property string activeError: bookmarksMode ? service.bookmarksError : service.lastError
   readonly property var accountFilterOptions: Model.accountFilterOptions(service.accounts)
 
   readonly property var accountDropdownOptions: {
@@ -57,11 +62,11 @@ Panel {
     "Roasting marshmallows",
     "Climbing the hill chart"
   ]
-  readonly property bool rotatingPhrases: service.refreshing
+  readonly property bool rotatingPhrases: service.refreshing || service.bookmarksRefreshing
 
   readonly property string heroStatusText: {
     if (service.actionStatus !== "") return service.actionStatus
-    if (service.lastError !== "") return service.lastError
+    if (activeError !== "") return activeError
     if (rotatingPhrases) return loadingPhrases[phraseIndex % loadingPhrases.length]
     return "Designed & built by 37signals"
   }
@@ -91,10 +96,12 @@ Panel {
 
   function setStateFilter(value) {
     stateFilter = String(value || "unread")
+    if (bookmarksMode) service.refreshBookmarksIfStale()
     resetFilteredView()
   }
 
   function emptyMessage() {
+    if (bookmarksMode) return "No bookmarks yet."
     if (service.notifications.length === 0 || stateFilter === "unread") return "You're all caught up."
     return "No previous notifications."
   }
@@ -107,6 +114,19 @@ Panel {
     if (value === "document") return Color.muted
     if (value === "boostreport" || value === "hill") return dim
     return foreground
+  }
+
+  // Bookmarks point at recordings, so they map onto the same semantic roles
+  // typeColor uses rather than a palette of their own.
+  function bookmarkColor(type) {
+    var value = String(type || "").toLowerCase().split("::")[0]
+    if (value === "todoset" || value === "todolist" || value === "todo") return Color.accent
+    if (value === "schedule") return urgent
+    if (value === "message" || value === "messageboard" || value === "comment") return foreground
+    if (value === "chat" || value === "campfire") return foreground
+    if (value === "document" || value === "vault" || value === "upload") return Color.muted
+    if (value === "inbox") return Qt.darker(foreground, 1.2)
+    return dim
   }
 
   function accountUnreadCount(accountId) {
@@ -134,21 +154,21 @@ Panel {
   }
 
   function ensureSelection() {
-    if (filteredNotifications.length === 0) {
+    if (activeList.length === 0) {
       selectedIndex = 0
       return
     }
-    selectedIndex = Math.max(0, Math.min(filteredNotifications.length - 1, selectedIndex))
+    selectedIndex = Math.max(0, Math.min(activeList.length - 1, selectedIndex))
   }
 
   function select(index) {
     cursorActive = true
-    selectedIndex = Math.max(0, Math.min(filteredNotifications.length - 1, index))
+    selectedIndex = Math.max(0, Math.min(activeList.length - 1, index))
     scrollSelectionIntoView()
   }
 
   function moveSelection(delta) {
-    if (filteredNotifications.length === 0) return
+    if (activeList.length === 0) return
     if (!cursorActive) {
       select(0)
       return
@@ -157,13 +177,15 @@ Panel {
   }
 
   function activateSelection() {
-    if (!cursorActive || filteredNotifications.length === 0) return
-    service.openNotification(filteredNotifications[selectedIndex])
+    if (!cursorActive || activeList.length === 0) return
+    if (bookmarksMode) service.openBookmark(activeList[selectedIndex])
+    else service.openNotification(activeList[selectedIndex])
   }
 
   function scrollSelectionIntoView() {
-    if (!notificationColumn || selectedIndex < 0 || selectedIndex >= notificationColumn.children.length) return
-    var wrapper = notificationColumn.children[selectedIndex]
+    var column = bookmarksMode ? bookmarkColumn : notificationColumn
+    if (!column || selectedIndex < 0 || selectedIndex >= column.children.length) return
+    var wrapper = column.children[selectedIndex]
     Qt.callLater(function() {
       if (!wrapper || !panelFlick) return
       var point = wrapper.mapToItem(panelFlick.contentItem, 0, 0)
@@ -186,10 +208,11 @@ Panel {
     nowMs = Date.now()
     if (panelFlick) panelFlick.contentY = 0
     service.refreshIfStale()
+    if (bookmarksMode) service.refreshBookmarksIfStale()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
-  onFilteredNotificationsChanged: ensureSelection()
+  onActiveListChanged: ensureSelection()
 
   PointerMoveGate {
     id: pointerGate
@@ -248,8 +271,9 @@ Panel {
       return JSON.stringify({
         accounts: service.accountCount,
         notifications: service.notifications.length,
+        bookmarks: service.bookmarks.length,
         unread: service.unreadCount,
-        visible: root.filteredNotifications.length,
+        visible: root.activeList.length,
         stateFilter: root.stateFilter,
         accountFilter: root.accountFilter,
         refreshing: service.refreshing,
@@ -302,9 +326,13 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
-        if (text === "r" || text === "R") service.refresh()
+        if (text === "r" || text === "R") {
+          service.refresh()
+          if (root.bookmarksMode) service.refreshBookmarks()
+        }
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
+        else if (text === "b" || text === "B") root.setStateFilter("bookmarks")
       }
 
       ColumnLayout {
@@ -362,11 +390,14 @@ Panel {
               id: refreshButton
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              iconText: service.refreshing ? "󰑓" : "󰑐"
+              iconText: root.rotatingPhrases ? "󰑓" : "󰑐"
               foreground: root.foreground
               fontFamily: root.fontFamily
-              enabled: !service.refreshing
-              onClicked: service.refresh()
+              enabled: !root.rotatingPhrases
+              onClicked: {
+                service.refresh()
+                if (root.bookmarksMode) service.refreshBookmarks()
+              }
             }
           }
 
@@ -431,6 +462,19 @@ Panel {
               verticalPadding: Style.space(1)
               onClicked: root.setStateFilter("previous")
             }
+
+            Button {
+              text: "BOOKMARKS"
+              selected: root.bookmarksMode
+              foreground: root.foreground
+              background: "transparent"
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(1)
+              onClicked: root.setStateFilter("bookmarks")
+            }
           }
         }
 
@@ -452,7 +496,7 @@ Panel {
             spacing: Style.space(12)
 
             Text {
-              visible: !service.refreshing && root.filteredNotifications.length === 0 && service.lastError === ""
+              visible: !root.activeRefreshing && root.activeList.length === 0 && root.activeError === ""
             width: parent.width
             text: root.emptyMessage()
             color: root.dim
@@ -464,8 +508,38 @@ Panel {
           }
 
           Column {
+            id: bookmarkColumn
+            visible: root.bookmarksMode && root.filteredBookmarks.length > 0
+            width: parent.width
+            spacing: Style.space(8)
+
+            Repeater {
+              model: root.filteredBookmarks
+
+              BookmarkRow {
+                id: bookmarkRow
+                required property var modelData
+                required property int index
+                width: bookmarkColumn.width
+                bookmark: modelData
+                nowMs: root.nowMs
+                showAccount: root.accountFilter === "" && service.accountCount > 1
+                foreground: root.foreground
+                dim: root.dim
+                badge: root.bookmarkColor(modelData.type)
+                fontFamily: root.fontFamily
+                hasCursor: root.cursorActive && root.selectedIndex === index
+                onActivated: service.openBookmark(bookmarkRow.modelData)
+                onPointerMoved: function(mouse) {
+                  if (pointerGate.moved(bookmarkRow, mouse)) root.select(bookmarkRow.index)
+                }
+              }
+            }
+          }
+
+          Column {
             id: notificationColumn
-            visible: root.filteredNotifications.length > 0
+            visible: !root.bookmarksMode && root.filteredNotifications.length > 0
             width: parent.width
             spacing: Style.space(8)
 
@@ -507,35 +581,13 @@ Panel {
                   anchors.rightMargin: Style.space(10)
                   spacing: Style.space(9)
 
-                  Rectangle {
+                  TypeBadge {
                     Layout.preferredWidth: Style.space(24)
                     Layout.preferredHeight: Style.space(24)
                     Layout.alignment: Qt.AlignTop
-                    radius: width / 2
                     color: root.typeColor(notificationRow.modelData.type)
-
-                    // Center the glyph's painted ink, not its em box — icon
-                    // glyphs sit off-center in the monospace cell (see the
-                    // kit's OpticalGlyph, extended here to both axes since a
-                    // badge has no shared baseline to preserve).
-                    TextMetrics {
-                      id: glyphMetrics
-                      font.family: root.fontFamily
-                      font.pixelSize: Math.round(Style.font.icon)
-                      text: Model.notificationTypeIcon(notificationRow.modelData.type)
-                    }
-
-                    Text {
-                      id: glyphText
-                      anchors.centerIn: parent
-                      anchors.horizontalCenterOffset: glyphText.implicitWidth / 2 - (glyphMetrics.tightBoundingRect.x + glyphMetrics.tightBoundingRect.width / 2)
-                      anchors.verticalCenterOffset: glyphText.implicitHeight / 2 - (glyphText.baselineOffset + glyphMetrics.tightBoundingRect.y + glyphMetrics.tightBoundingRect.height / 2)
-                      text: glyphMetrics.text
-                      color: Color.popups.background
-                      font.family: root.fontFamily
-                      font.pixelSize: glyphMetrics.font.pixelSize
-                      renderType: Text.NativeRendering
-                    }
+                    fontFamily: root.fontFamily
+                    glyph: Model.notificationTypeIcon(notificationRow.modelData.type)
                   }
 
                   ColumnLayout {

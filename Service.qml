@@ -16,6 +16,11 @@ Item {
   property string lastError: ""
   property string actionStatus: ""
 
+  property var bookmarks: []
+  property bool bookmarksRefreshing: false
+  property date bookmarksLastUpdated: new Date(0)
+  property string bookmarksError: ""
+
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 600, 60, 3600)
   readonly property int maxPerAccount: intSetting("maxPerAccount", 20, 5, 50)
   readonly property int accountCount: accounts.length
@@ -28,6 +33,14 @@ Item {
   property var _currentAccount: null
   property string _notificationsOutput: ""
   property string _notificationsError: ""
+  property bool _bookmarksPending: false
+  property var _bookmarkAccounts: []
+  property var _fetchedBookmarks: []
+  property int _bookmarkIndex: 0
+  property var _currentBookmarkAccount: null
+  property string _bookmarksOutput: ""
+  property string _bookmarksErrorOutput: ""
+  property var _bookmarkErrors: []
   property var _readQueue: []
   property var _readingNotification: null
   property string _readOutput: ""
@@ -99,6 +112,78 @@ Item {
     refreshing = false
     lastUpdated = new Date()
     lastError = _partialErrors.length > 0 ? _partialErrors.join(" · ") : ""
+  }
+
+  function refreshBookmarksIfStale() {
+    var updatedAt = bookmarksLastUpdated instanceof Date ? bookmarksLastUpdated.getTime() : 0
+    if (updatedAt <= 0 || Date.now() - updatedAt >= refreshIntervalSec * 1000) refreshBookmarks()
+  }
+
+  function refreshBookmarks() {
+    if (bookmarksRefreshing) return
+    bookmarksRefreshing = true
+    bookmarksError = ""
+    _bookmarkErrors = []
+
+    // Bookmarks are loaded lazily, so the account list can still be on its way.
+    if (accounts.length === 0) {
+      _bookmarksPending = true
+      refresh()
+      return
+    }
+    beginBookmarkFetch(accounts)
+  }
+
+  function beginBookmarkFetch(nextAccounts) {
+    _bookmarksPending = false
+    _bookmarkAccounts = nextAccounts
+    _fetchedBookmarks = []
+    _bookmarkIndex = 0
+    fetchNextBookmarkAccount()
+  }
+
+  // The CLI has no bookmarks command yet, so this goes through the raw API
+  // passthrough. Swapping in `basecamp bookmarks list` later is a change to
+  // this command only.
+  function bookmarkCommand(accountId) {
+    return [
+      "basecamp", "api", "get", "my/bookmarks.json",
+      "--account", String(accountId),
+      "--json"
+    ]
+  }
+
+  function fetchNextBookmarkAccount() {
+    if (_bookmarkIndex >= _bookmarkAccounts.length) {
+      finishBookmarkRefresh()
+      return
+    }
+
+    _currentBookmarkAccount = _bookmarkAccounts[_bookmarkIndex]
+    _bookmarksOutput = ""
+    _bookmarksErrorOutput = ""
+    bookmarksProcess.command = bookmarkCommand(_currentBookmarkAccount.id)
+    bookmarksProcess.running = true
+  }
+
+  function finishBookmarkRefresh() {
+    bookmarks = Model.sortBookmarks(_fetchedBookmarks)
+    bookmarksRefreshing = false
+    bookmarksLastUpdated = new Date()
+    bookmarksError = _bookmarkErrors.length > 0 ? _bookmarkErrors.join(" · ") : ""
+  }
+
+  // A bookmarks request that is still waiting for the account list has nothing
+  // left to wait for once that list fails.
+  function abandonPendingBookmarks(error) {
+    if (!_bookmarksPending) return
+    _bookmarksPending = false
+    bookmarksRefreshing = false
+    bookmarksError = error
+  }
+
+  function openBookmark(item) {
+    if (item && item.url) Qt.openUrlExternally(String(item.url))
   }
 
   function openNotification(item) {
@@ -208,6 +293,7 @@ Item {
         root.installed = exitCode !== 127
         root.lastError = root.conciseError(stderr || stdout, root.installed ? "Could not list Basecamp accounts" : "Basecamp CLI is not installed")
         root.refreshing = false
+        root.abandonPendingBookmarks(root.lastError)
         return
       }
 
@@ -215,9 +301,11 @@ Item {
       if (!parsed.ok) {
         root.lastError = parsed.error
         root.refreshing = false
+        root.abandonPendingBookmarks(parsed.error)
         return
       }
       root.accounts = parsed.accounts
+      if (root._bookmarksPending) root.beginBookmarkFetch(parsed.accounts)
       root.beginNotificationFetch(parsed.accounts)
     }
   }
@@ -249,6 +337,36 @@ Item {
       }
       root._fetchIndex += 1
       root.fetchNextAccount()
+    }
+  }
+
+  Process {
+    id: bookmarksProcess
+    running: false
+    command: []
+    stdout: StdioCollector {
+      id: bookmarksStdout
+      waitForEnd: true
+      onStreamFinished: root._bookmarksOutput = text
+    }
+    stderr: StdioCollector {
+      id: bookmarksStderr
+      waitForEnd: true
+      onStreamFinished: root._bookmarksErrorOutput = text
+    }
+    onExited: function(exitCode) {
+      var account = root._currentBookmarkAccount
+      var stdout = String(bookmarksStdout.text || root._bookmarksOutput || "")
+      var stderr = String(bookmarksStderr.text || root._bookmarksErrorOutput || "")
+      if (exitCode === 0) {
+        var parsed = Model.parseBookmarks(stdout, account)
+        if (parsed.ok) root._fetchedBookmarks = root._fetchedBookmarks.concat(parsed.items)
+        else root._bookmarkErrors.push(account.name + ": " + parsed.error)
+      } else {
+        root._bookmarkErrors.push(account.name + ": " + root.conciseError(stderr || stdout, "request failed"))
+      }
+      root._bookmarkIndex += 1
+      root.fetchNextBookmarkAccount()
     }
   }
 

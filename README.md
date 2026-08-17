@@ -12,13 +12,14 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Filters notifications by account or between unread and all items.
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
+- Lists your Basecamp bookmarks from all accounts in a Bookmarks tab, most recently saved first, and opens the bookmarked item in the browser.
 - Changes the bar logo color when unread notifications exist.
 - Polls every 10 minutes. Right-click or middle-click the bar logo to refresh immediately.
 
 ## Requirements
 
 - Omarchy with Quickshell plugin support.
-- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) with the `accounts` and `notifications` commands.
+- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) with the `accounts`, `notifications`, and `api` commands.
 - A Basecamp CLI login with full access. Read-only OAuth access cannot mark notifications as read.
 
 Install the Basecamp CLI on Omarchy:
@@ -60,11 +61,14 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Left-click the Basecamp logo to open or close the panel.
 - Right-click or middle-click the logo to refresh.
 - Select an account to filter the combined feed.
-- Select `Unread` or `All` below the Basecamp title.
+- Select `Unread`, `All`, or `Bookmarks` below the Basecamp title.
 - Click a notification to open it. Unread notifications are also marked as read.
-- Use the up and down arrow keys to move through notifications.
+- Click a bookmark to open the bookmarked item in the browser.
+- Use the up and down arrow keys to move through the list.
 - Use the left and right arrow keys to move through account filters.
-- Press `U` for unread notifications, `A` for all notifications, or `R` to refresh.
+- Press `U` for unread notifications, `A` for all notifications, `B` for bookmarks, or `R` to refresh.
+
+Bookmarks load the first time the Bookmarks tab is opened and refresh on the same interval as notifications. Accounts with no bookmarks contribute nothing to the list.
 
 ## Development
 
@@ -124,9 +128,12 @@ The plugin runs these local CLI commands:
 basecamp accounts list --json
 basecamp notifications list --account <account-id> --json
 basecamp notifications read <notification-id> --account <account-id> --json
+basecamp api get my/bookmarks.json --account <account-id> --json
 ```
 
-Notification data is held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.
+The Basecamp CLI has no bookmarks command yet, so the Bookmarks tab reads them through the CLI's raw API passthrough. It is a plain `GET`, made with the CLI's own credentials, and it will be replaced with a first-class command when one exists.
+
+Notification and bookmark data are held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.
 
 ## License
 

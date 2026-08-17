@@ -73,6 +73,39 @@ test("demo CLI fixtures follow the production account and notification contracts
   })
 })
 
+test("demo CLI fixtures follow the production bookmark contract", () => {
+  withState(stateDir => {
+    const accountsResult = successfulJson(["accounts", "list", "--json"], stateDir)
+    const parsedAccounts = Model.parseAccounts(JSON.stringify(accountsResult))
+
+    const allBookmarks = []
+    const rawBookmarks = []
+    for (const account of parsedAccounts.accounts) {
+      const result = successfulJson([
+        "api", "get", "my/bookmarks.json", "--account", account.id, "--json"
+      ], stateDir)
+      rawBookmarks.push(...result.data)
+
+      const parsed = Model.parseBookmarks(JSON.stringify(result), account)
+      assert.equal(parsed.ok, true)
+      assert.ok(parsed.items.length > 0)
+      allBookmarks.push(...parsed.items)
+    }
+
+    assert.ok(rawBookmarks.every(bookmark => bookmark.recording.app_url === ""))
+    assert.ok(rawBookmarks.every(bookmark => Number.isFinite(Date.parse(bookmark.created_at))))
+    assert.ok(rawBookmarks.every(bookmark => bookmark.recording.bucket.name !== ""))
+
+    const types = new Set(rawBookmarks.map(bookmark => bookmark.recording.type))
+    assert.deepEqual(types, new Set(["Todoset", "Todo", "Inbox", "Vault", "Document", "Schedule::Entry"]))
+
+    const sorted = Model.sortBookmarks(allBookmarks)
+    for (let index = 1; index < sorted.length; index++) {
+      assert.ok(sorted[index - 1].timestampMs >= sorted[index].timestampMs)
+    }
+  })
+})
+
 test("demo CLI keeps mark-as-read state for subsequent refreshes", () => {
   withState(stateDir => {
     const before = successfulJson([
