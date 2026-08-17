@@ -73,6 +73,38 @@ test("demo CLI fixtures follow the production account and notification contracts
   })
 })
 
+test("demo CLI fixtures follow the production project contract", () => {
+  withState(stateDir => {
+    const accountsResult = successfulJson(["accounts", "list", "--json"], stateDir)
+    const parsedAccounts = Model.parseAccounts(JSON.stringify(accountsResult))
+
+    const allProjects = []
+    const rawProjects = []
+    for (const account of parsedAccounts.accounts) {
+      const result = successfulJson([
+        "projects", "list", "--account", account.id, "--json"
+      ], stateDir)
+      rawProjects.push(...result.data)
+
+      const parsed = Model.parseProjects(JSON.stringify(result), account)
+      assert.equal(parsed.ok, true)
+      assert.ok(parsed.items.length > 0)
+      allProjects.push(...parsed.items)
+    }
+
+    assert.ok(rawProjects.every(project => project.status === "active"))
+    assert.ok(rawProjects.every(project => project.app_url === ""))
+    assert.ok(rawProjects.every(project => Number.isFinite(Date.parse(project.updated_at))))
+    assert.ok(allProjects.some(project => project.description !== ""))
+    assert.ok(allProjects.some(project => project.description === ""))
+
+    const sorted = Model.sortProjects(allProjects)
+    for (let index = 1; index < sorted.length; index++) {
+      assert.ok(sorted[index - 1].timestampMs >= sorted[index].timestampMs)
+    }
+  })
+})
+
 test("demo CLI keeps mark-as-read state for subsequent refreshes", () => {
   withState(stateDir => {
     const before = successfulJson([

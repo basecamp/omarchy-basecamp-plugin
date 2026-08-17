@@ -88,8 +88,36 @@ def rendered_notification(source, read, now):
     return notification
 
 
+def rendered_project(source, now):
+    project = deepcopy(source)
+    minutes_ago = int(project.pop("minutes_ago"))
+    project.pop("account_id", None)
+
+    timestamp = now - timedelta(minutes=minutes_ago)
+    formatted = timestamp.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    project["created_at"] = formatted
+    project["updated_at"] = formatted
+    project["status"] = "active"
+    project["app_url"] = ""
+    return project
+
+
 def list_accounts(fixture):
     print(json.dumps({"ok": True, "data": fixture["accounts"]}))
+
+
+def list_projects(fixture, args):
+    account_id = option(args, "--account")
+    account_by_id(fixture, account_id)
+    now = datetime.now(timezone.utc)
+
+    projects = [
+        rendered_project(source, now)
+        for source in fixture.get("projects", [])
+        if str(source["account_id"]) == str(account_id)
+    ]
+    projects.sort(key=lambda project: project["updated_at"], reverse=True)
+    print(json.dumps({"ok": True, "data": projects}))
 
 
 def list_notifications(fixture, args):
@@ -145,6 +173,9 @@ def main():
     elif (len(args) == 5 and args[:2] == ["notifications", "list"]
           and args[2] == "--account" and args[4] == "--json"):
         list_notifications(fixture, args)
+    elif (len(args) == 5 and args[:2] == ["projects", "list"]
+          and args[2] == "--account" and args[4] == "--json"):
+        list_projects(fixture, args)
     elif (len(args) == 6 and args[:2] == ["notifications", "read"]
           and args[3] == "--account" and args[5] == "--json"):
         mark_notification_read(fixture, args)

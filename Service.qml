@@ -16,6 +16,11 @@ Item {
   property string lastError: ""
   property string actionStatus: ""
 
+  property var projects: []
+  property bool projectsRefreshing: false
+  property date projectsLastUpdated: new Date(0)
+  property string projectsError: ""
+
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 600, 60, 3600)
   readonly property int maxPerAccount: intSetting("maxPerAccount", 20, 5, 50)
   readonly property int accountCount: accounts.length
@@ -28,6 +33,14 @@ Item {
   property var _currentAccount: null
   property string _notificationsOutput: ""
   property string _notificationsError: ""
+  property bool _projectsPending: false
+  property var _projectAccounts: []
+  property var _fetchedProjects: []
+  property int _projectIndex: 0
+  property var _currentProjectAccount: null
+  property string _projectsOutput: ""
+  property string _projectsErrorOutput: ""
+  property var _projectErrors: []
   property var _readQueue: []
   property var _readingNotification: null
   property string _readOutput: ""
@@ -99,6 +112,71 @@ Item {
     refreshing = false
     lastUpdated = new Date()
     lastError = _partialErrors.length > 0 ? _partialErrors.join(" · ") : ""
+  }
+
+  function refreshProjectsIfStale() {
+    var updatedAt = projectsLastUpdated instanceof Date ? projectsLastUpdated.getTime() : 0
+    if (updatedAt <= 0 || Date.now() - updatedAt >= refreshIntervalSec * 1000) refreshProjects()
+  }
+
+  function refreshProjects() {
+    if (projectsRefreshing) return
+    projectsRefreshing = true
+    projectsError = ""
+    _projectErrors = []
+
+    // Projects are loaded lazily, so the account list can still be on its way.
+    if (accounts.length === 0) {
+      _projectsPending = true
+      refresh()
+      return
+    }
+    beginProjectFetch(accounts)
+  }
+
+  function beginProjectFetch(nextAccounts) {
+    _projectsPending = false
+    _projectAccounts = nextAccounts
+    _fetchedProjects = []
+    _projectIndex = 0
+    fetchNextProjectAccount()
+  }
+
+  function fetchNextProjectAccount() {
+    if (_projectIndex >= _projectAccounts.length) {
+      finishProjectRefresh()
+      return
+    }
+
+    _currentProjectAccount = _projectAccounts[_projectIndex]
+    _projectsOutput = ""
+    _projectsErrorOutput = ""
+    projectsProcess.command = [
+      "basecamp", "projects", "list",
+      "--account", String(_currentProjectAccount.id),
+      "--json"
+    ]
+    projectsProcess.running = true
+  }
+
+  function finishProjectRefresh() {
+    projects = Model.sortProjects(_fetchedProjects)
+    projectsRefreshing = false
+    projectsLastUpdated = new Date()
+    projectsError = _projectErrors.length > 0 ? _projectErrors.join(" · ") : ""
+  }
+
+  // A projects request that is still waiting for the account list has nothing
+  // left to wait for once that list fails.
+  function abandonPendingProjects(error) {
+    if (!_projectsPending) return
+    _projectsPending = false
+    projectsRefreshing = false
+    projectsError = error
+  }
+
+  function openProject(item) {
+    if (item && item.url) Qt.openUrlExternally(String(item.url))
   }
 
   function openNotification(item) {
@@ -208,6 +286,7 @@ Item {
         root.installed = exitCode !== 127
         root.lastError = root.conciseError(stderr || stdout, root.installed ? "Could not list Basecamp accounts" : "Basecamp CLI is not installed")
         root.refreshing = false
+        root.abandonPendingProjects(root.lastError)
         return
       }
 
@@ -215,9 +294,11 @@ Item {
       if (!parsed.ok) {
         root.lastError = parsed.error
         root.refreshing = false
+        root.abandonPendingProjects(parsed.error)
         return
       }
       root.accounts = parsed.accounts
+      if (root._projectsPending) root.beginProjectFetch(parsed.accounts)
       root.beginNotificationFetch(parsed.accounts)
     }
   }
@@ -249,6 +330,36 @@ Item {
       }
       root._fetchIndex += 1
       root.fetchNextAccount()
+    }
+  }
+
+  Process {
+    id: projectsProcess
+    running: false
+    command: []
+    stdout: StdioCollector {
+      id: projectsStdout
+      waitForEnd: true
+      onStreamFinished: root._projectsOutput = text
+    }
+    stderr: StdioCollector {
+      id: projectsStderr
+      waitForEnd: true
+      onStreamFinished: root._projectsErrorOutput = text
+    }
+    onExited: function(exitCode) {
+      var account = root._currentProjectAccount
+      var stdout = String(projectsStdout.text || root._projectsOutput || "")
+      var stderr = String(projectsStderr.text || root._projectsErrorOutput || "")
+      if (exitCode === 0) {
+        var parsed = Model.parseProjects(stdout, account)
+        if (parsed.ok) root._fetchedProjects = root._fetchedProjects.concat(parsed.items)
+        else root._projectErrors.push(account.name + ": " + parsed.error)
+      } else {
+        root._projectErrors.push(account.name + ": " + root.conciseError(stderr || stdout, "request failed"))
+      }
+      root._projectIndex += 1
+      root.fetchNextProjectAccount()
     }
   }
 

@@ -12,13 +12,14 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Filters notifications by account or between unread and all items.
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
+- Lists every active project across all accounts in a Projects tab, most recently active first, and opens the selected project in the browser.
 - Changes the bar logo color when unread notifications exist.
 - Polls every 10 minutes. Right-click or middle-click the bar logo to refresh immediately.
 
 ## Requirements
 
 - Omarchy with Quickshell plugin support.
-- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) with the `accounts` and `notifications` commands.
+- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) with the `accounts`, `notifications`, and `projects` commands.
 - A Basecamp CLI login with full access. Read-only OAuth access cannot mark notifications as read.
 
 Install the Basecamp CLI on Omarchy:
@@ -33,6 +34,7 @@ Authenticate and confirm that the CLI can see your accounts:
 basecamp auth login --scope full
 basecamp accounts list
 basecamp notifications list
+basecamp projects list
 ```
 
 The plugin uses the CLI's existing credential store. It does not read, copy, or store Basecamp access tokens.
@@ -60,11 +62,14 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Left-click the Basecamp logo to open or close the panel.
 - Right-click or middle-click the logo to refresh.
 - Select an account to filter the combined feed.
-- Select `Unread` or `All` below the Basecamp title.
+- Select `New for you`, `Previous notifications`, or `Projects` below the Basecamp title.
 - Click a notification to open it. Unread notifications are also marked as read.
-- Use the up and down arrow keys to move through notifications.
+- Click a project to open it in the browser.
+- Use the up and down arrow keys to move through the list.
 - Use the left and right arrow keys to move through account filters.
-- Press `U` for unread notifications, `A` for all notifications, or `R` to refresh.
+- Press `U` for new notifications, `P` for previous notifications, `O` for projects, or `R` to refresh.
+
+Projects load the first time the Projects tab is opened and refresh on the same interval as notifications. Accounts with no active projects contribute nothing to the list.
 
 ## Development
 
@@ -124,9 +129,10 @@ The plugin runs these local CLI commands:
 basecamp accounts list --json
 basecamp notifications list --account <account-id> --json
 basecamp notifications read <notification-id> --account <account-id> --json
+basecamp projects list --account <account-id> --json
 ```
 
-Notification data is held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.
+Notification and project data are held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.
 
 ## License
 

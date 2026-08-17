@@ -62,6 +62,45 @@ test("unnamed Pings use participant names while named Pings keep their title", (
   assert.equal(named.items[0].title, "Design crew")
 })
 
+test("parseProjects normalizes project fields and skips ids it cannot use", () => {
+  const result = Model.parseProjects(payload([
+    {
+      id: 900,
+      name: "ONP &amp; friends",
+      description: "<p>Campaign planning</p>",
+      app_url: "https://example.test/900",
+      status: "active",
+      updated_at: "2026-08-16T22:52:52.161Z"
+    },
+    { name: "Missing id", app_url: "https://example.test/none" }
+  ]), account)
+
+  assert.equal(result.ok, true)
+  assert.equal(result.items.length, 1)
+  assert.deepEqual(result.items[0], {
+    id: "900",
+    accountId: "42",
+    accountName: "Main & Co",
+    accountOrder: 1,
+    name: "ONP & friends",
+    description: "Campaign planning",
+    url: "https://example.test/900",
+    timestamp: "2026-08-16T22:52:52.161Z",
+    timestampMs: Date.parse("2026-08-16T22:52:52.161Z")
+  })
+})
+
+test("parseProjects keeps active projects and drops archived or trashed ones", () => {
+  const result = Model.parseProjects(payload([
+    { id: 1, name: "Active", status: "active" },
+    { id: 2, name: "Archived", status: "archived" },
+    { id: 3, name: "Trashed", status: "trashed" },
+    { id: 4, name: "Unstated status" }
+  ]), account)
+
+  assert.deepEqual(result.items.map(item => item.name), ["Active", "Unstated status"])
+})
+
 test("sortNotifications orders newest first with deterministic ties", () => {
   const items = [
     { id: "z", timestampMs: 1, accountOrder: 0 },
@@ -71,6 +110,28 @@ test("sortNotifications orders newest first with deterministic ties", () => {
   ]
 
   assert.deepEqual(Model.sortNotifications(items).map(item => item.id), ["c", "a", "b", "z"])
+})
+
+test("sortProjects orders most recently active first with deterministic ties", () => {
+  const items = [
+    { id: "z", timestampMs: 1, accountOrder: 0 },
+    { id: "b", timestampMs: 3, accountOrder: 1 },
+    { id: "a", timestampMs: 3, accountOrder: 1 },
+    { id: "c", timestampMs: 3, accountOrder: 0 }
+  ]
+
+  assert.deepEqual(Model.sortProjects(items).map(item => item.id), ["c", "a", "b", "z"])
+})
+
+test("filterProjects narrows to a single account and keeps every project otherwise", () => {
+  const items = [
+    { id: "1", accountId: "a" },
+    { id: "2", accountId: "b" },
+    { id: "3", accountId: "a" }
+  ]
+
+  assert.deepEqual(Model.filterProjects(items, "a").map(item => item.id), ["1", "3"])
+  assert.deepEqual(Model.filterProjects(items, "").map(item => item.id), ["1", "2", "3"])
 })
 
 test("filterNotifications combines account and read-state filters without reordering", () => {
@@ -95,6 +156,16 @@ test("notificationMeta includes account context only when requested", () => {
 
   assert.equal(Model.notificationMeta(item, 0, false), "Alice • Project")
   assert.equal(Model.notificationMeta(item, 0, true), "Alice • Project (Main)")
+})
+
+test("projectMeta appends account context only when requested", () => {
+  const project = { description: "Campaign planning", accountName: "Main" }
+  const bare = { description: "", accountName: "Main" }
+
+  assert.equal(Model.projectMeta(project, false), "Campaign planning")
+  assert.equal(Model.projectMeta(project, true), "Campaign planning • Main")
+  assert.equal(Model.projectMeta(bare, true), "Main")
+  assert.equal(Model.projectMeta(bare, false), "")
 })
 
 test("invalid CLI output returns a useful parse failure", () => {

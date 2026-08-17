@@ -152,5 +152,91 @@
       "bucket_name": "Customer research",
       "creator": { "name": "Jordan Lee" }
     }
+  ],
+  "projects": [
+    {
+      "id": 701,
+      "account_id": 1001,
+      "minutes_ago": 2,
+      "name": "Website refresh",
+      "description": "New homepage direction, navigation, and marketing pages."
+    },
+    {
+      "id": 702,
+      "account_id": 1001,
+      "minutes_ago": 17,
+      "name": "Product launch",
+      "description": "Everything shipping with the fall release."
+    },
+    {
+      "id": 703,
+      "account_id": 1001,
+      "minutes_ago": 43,
+      "name": "Company HQ",
+      "description": "Announcements, policies, and everyone at the company."
+    },
+    {
+      "id": 704,
+      "account_id": 1001,
+      "minutes_ago": 104,
+      "name": "Customer experience",
+      "description": ""
+    },
+    {
+      "id": 711,
+      "account_id": 1002,
+      "minutes_ago": 6,
+      "name": "Fall launch",
+      "description": "Launch plan, hill charts, and the release checklist."
+    },
+    {
+      "id": 712,
+      "account_id": 1002,
+      "minutes_ago": 24,
+      "name": "Product planning",
+      "description": "Shaping and scheduling the next cycle."
+    },
+    {
+      "id": 713,
+      "account_id": 1002,
+      "minutes_ago": 58,
+      "name": "Brand system",
+      "description": "Typography, color, and the component library."
+    },
+    {
+      "id": 714,
+      "account_id": 1002,
+      "minutes_ago": 190,
+      "name": "Team planning",
+      "description": ""
+    },
+    {
+      "id": 721,
+      "account_id": 1003,
+      "minutes_ago": 11,
+      "name": "Studio team",
+      "description": "Day-to-day studio coordination."
+    },
+    {
+      "id": 722,
+      "account_id": 1003,
+      "minutes_ago": 31,
+      "name": "Client workshops",
+      "description": "Discovery sessions and workshop materials."
+    },
+    {
+      "id": 723,
+      "account_id": 1003,
+      "minutes_ago": 76,
+      "name": "Onboarding refresh",
+      "description": "Rebuilding the first-run experience."
+    },
+    {
+      "id": 724,
+      "account_id": 1003,
+      "minutes_ago": 330,
+      "name": "Customer research",
+      "description": ""
+    }
   ]
 }

@@ -23,7 +23,12 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property bool projectsMode: stateFilter === "projects"
   readonly property var filteredNotifications: Model.filterNotifications(service.notifications, accountFilter, stateFilter)
+  readonly property var filteredProjects: Model.filterProjects(service.projects, accountFilter)
+  readonly property var activeList: projectsMode ? filteredProjects : filteredNotifications
+  readonly property bool activeRefreshing: projectsMode ? service.projectsRefreshing : service.refreshing
+  readonly property string activeError: projectsMode ? service.projectsError : service.lastError
   readonly property var accountFilterOptions: Model.accountFilterOptions(service.accounts)
 
   readonly property var accountDropdownOptions: {
@@ -57,11 +62,11 @@ Panel {
     "Roasting marshmallows",
     "Climbing the hill chart"
   ]
-  readonly property bool rotatingPhrases: service.refreshing
+  readonly property bool rotatingPhrases: service.refreshing || service.projectsRefreshing
 
   readonly property string heroStatusText: {
     if (service.actionStatus !== "") return service.actionStatus
-    if (service.lastError !== "") return service.lastError
+    if (activeError !== "") return activeError
     if (rotatingPhrases) return loadingPhrases[phraseIndex % loadingPhrases.length]
     return "Designed & built by 37signals"
   }
@@ -91,10 +96,12 @@ Panel {
 
   function setStateFilter(value) {
     stateFilter = String(value || "unread")
+    if (projectsMode) service.refreshProjectsIfStale()
     resetFilteredView()
   }
 
   function emptyMessage() {
+    if (projectsMode) return "No active projects."
     if (service.notifications.length === 0 || stateFilter === "unread") return "You're all caught up."
     return "No previous notifications."
   }
@@ -134,21 +141,21 @@ Panel {
   }
 
   function ensureSelection() {
-    if (filteredNotifications.length === 0) {
+    if (activeList.length === 0) {
       selectedIndex = 0
       return
     }
-    selectedIndex = Math.max(0, Math.min(filteredNotifications.length - 1, selectedIndex))
+    selectedIndex = Math.max(0, Math.min(activeList.length - 1, selectedIndex))
   }
 
   function select(index) {
     cursorActive = true
-    selectedIndex = Math.max(0, Math.min(filteredNotifications.length - 1, index))
+    selectedIndex = Math.max(0, Math.min(activeList.length - 1, index))
     scrollSelectionIntoView()
   }
 
   function moveSelection(delta) {
-    if (filteredNotifications.length === 0) return
+    if (activeList.length === 0) return
     if (!cursorActive) {
       select(0)
       return
@@ -157,13 +164,15 @@ Panel {
   }
 
   function activateSelection() {
-    if (!cursorActive || filteredNotifications.length === 0) return
-    service.openNotification(filteredNotifications[selectedIndex])
+    if (!cursorActive || activeList.length === 0) return
+    if (projectsMode) service.openProject(activeList[selectedIndex])
+    else service.openNotification(activeList[selectedIndex])
   }
 
   function scrollSelectionIntoView() {
-    if (!notificationColumn || selectedIndex < 0 || selectedIndex >= notificationColumn.children.length) return
-    var wrapper = notificationColumn.children[selectedIndex]
+    var column = projectsMode ? projectColumn : notificationColumn
+    if (!column || selectedIndex < 0 || selectedIndex >= column.children.length) return
+    var wrapper = column.children[selectedIndex]
     Qt.callLater(function() {
       if (!wrapper || !panelFlick) return
       var point = wrapper.mapToItem(panelFlick.contentItem, 0, 0)
@@ -186,10 +195,11 @@ Panel {
     nowMs = Date.now()
     if (panelFlick) panelFlick.contentY = 0
     service.refreshIfStale()
+    if (projectsMode) service.refreshProjectsIfStale()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
-  onFilteredNotificationsChanged: ensureSelection()
+  onActiveListChanged: ensureSelection()
 
   PointerMoveGate {
     id: pointerGate
@@ -248,8 +258,9 @@ Panel {
       return JSON.stringify({
         accounts: service.accountCount,
         notifications: service.notifications.length,
+        projects: service.projects.length,
         unread: service.unreadCount,
-        visible: root.filteredNotifications.length,
+        visible: root.activeList.length,
         stateFilter: root.stateFilter,
         accountFilter: root.accountFilter,
         refreshing: service.refreshing,
@@ -302,9 +313,13 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
-        if (text === "r" || text === "R") service.refresh()
+        if (text === "r" || text === "R") {
+          service.refresh()
+          if (root.projectsMode) service.refreshProjects()
+        }
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
+        else if (text === "o" || text === "O") root.setStateFilter("projects")
       }
 
       ColumnLayout {
@@ -362,11 +377,14 @@ Panel {
               id: refreshButton
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              iconText: service.refreshing ? "󰑓" : "󰑐"
+              iconText: root.rotatingPhrases ? "󰑓" : "󰑐"
               foreground: root.foreground
               fontFamily: root.fontFamily
-              enabled: !service.refreshing
-              onClicked: service.refresh()
+              enabled: !root.rotatingPhrases
+              onClicked: {
+                service.refresh()
+                if (root.projectsMode) service.refreshProjects()
+              }
             }
           }
 
@@ -431,6 +449,19 @@ Panel {
               verticalPadding: Style.space(1)
               onClicked: root.setStateFilter("previous")
             }
+
+            Button {
+              text: "PROJECTS"
+              selected: root.projectsMode
+              foreground: root.foreground
+              background: "transparent"
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(1)
+              onClicked: root.setStateFilter("projects")
+            }
           }
         }
 
@@ -452,7 +483,7 @@ Panel {
             spacing: Style.space(12)
 
             Text {
-              visible: !service.refreshing && root.filteredNotifications.length === 0 && service.lastError === ""
+              visible: !root.activeRefreshing && root.activeList.length === 0 && root.activeError === ""
             width: parent.width
             text: root.emptyMessage()
             color: root.dim
@@ -464,8 +495,36 @@ Panel {
           }
 
           Column {
+            id: projectColumn
+            visible: root.projectsMode && root.filteredProjects.length > 0
+            width: parent.width
+            spacing: Style.space(8)
+
+            Repeater {
+              model: root.filteredProjects
+
+              ProjectRow {
+                id: projectRow
+                required property var modelData
+                required property int index
+                width: projectColumn.width
+                project: modelData
+                showAccount: root.accountFilter === "" && service.accountCount > 1
+                foreground: root.foreground
+                dim: root.dim
+                fontFamily: root.fontFamily
+                hasCursor: root.cursorActive && root.selectedIndex === index
+                onActivated: service.openProject(projectRow.modelData)
+                onPointerMoved: function(mouse) {
+                  if (pointerGate.moved(projectRow, mouse)) root.select(projectRow.index)
+                }
+              }
+            }
+          }
+
+          Column {
             id: notificationColumn
-            visible: root.filteredNotifications.length > 0
+            visible: !root.projectsMode && root.filteredNotifications.length > 0
             width: parent.width
             spacing: Style.space(8)
 

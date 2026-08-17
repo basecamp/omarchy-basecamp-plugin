@@ -71,6 +71,47 @@ function parseNotifications(raw, account, limit) {
   return { ok: true, error: "", items: items }
 }
 
+function parseProjects(raw, account) {
+  var result = parseJson(raw)
+  if (!result.ok) return { ok: false, error: result.error, items: [] }
+
+  var data = Array.isArray(result.value.data) ? result.value.data : []
+  var items = []
+  for (var i = 0; i < data.length; i++) {
+    var item = normalizeProject(data[i], account)
+    if (item) items.push(item)
+  }
+
+  return { ok: true, error: "", items: items }
+}
+
+function normalizeProject(value, account) {
+  var project = value || {}
+  var id = String(project.id || "").trim()
+  if (id === "") return null
+
+  // The CLI lists active projects by default, but a future default or an
+  // explicit --status would otherwise leak archived work into the tab.
+  var status = String(project.status || "active").toLowerCase()
+  if (status !== "active") return null
+
+  var timestamp = String(project.updated_at || project.created_at || "")
+  var parsedTime = Date.parse(timestamp)
+  if (!isFinite(parsedTime)) parsedTime = 0
+
+  return {
+    id: id,
+    accountId: String(account.id || ""),
+    accountName: cleanText(account.name || "Basecamp"),
+    accountOrder: Number(account.order || 0),
+    name: cleanText(project.name || ("Project " + id)),
+    description: cleanText(project.description || ""),
+    url: String(project.app_url || ""),
+    timestamp: timestamp,
+    timestampMs: parsedTime
+  }
+}
+
 function joinNames(names) {
   if (names.length <= 1) return names.join("")
   return names.slice(0, -1).join(", ") + " & " + names[names.length - 1]
@@ -124,15 +165,23 @@ function compareWithinAccount(a, b) {
   return Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
 }
 
+function compareNewestFirst(a, b) {
+  var timeDifference = Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
+  if (timeDifference !== 0) return timeDifference
+  var accountDifference = Number(a.accountOrder || 0) - Number(b.accountOrder || 0)
+  if (accountDifference !== 0) return accountDifference
+  return String(a.id || "").localeCompare(String(b.id || ""))
+}
+
 function sortNotifications(items) {
   var sorted = Array.isArray(items) ? items.slice() : []
-  sorted.sort(function(a, b) {
-    var timeDifference = Number(b.timestampMs || 0) - Number(a.timestampMs || 0)
-    if (timeDifference !== 0) return timeDifference
-    var accountDifference = Number(a.accountOrder || 0) - Number(b.accountOrder || 0)
-    if (accountDifference !== 0) return accountDifference
-    return String(a.id || "").localeCompare(String(b.id || ""))
-  })
+  sorted.sort(compareNewestFirst)
+  return sorted
+}
+
+function sortProjects(items) {
+  var sorted = Array.isArray(items) ? items.slice() : []
+  sorted.sort(compareNewestFirst)
   return sorted
 }
 
@@ -145,6 +194,15 @@ function filterNotifications(items, accountId, state) {
     if (selectedState === "unread") return item.unread === true
     if (selectedState === "previous") return item.unread !== true
     return true
+  })
+}
+
+function filterProjects(items, accountId) {
+  var source = Array.isArray(items) ? items : []
+  var selectedAccount = String(accountId || "")
+  if (selectedAccount === "") return source.slice()
+  return source.filter(function(item) {
+    return String(item.accountId || "") === selectedAccount
   })
 }
 
@@ -231,16 +289,30 @@ function notificationMeta(item, nowMs, showAccount) {
   return parts.join(" • ")
 }
 
+function projectMeta(item, showAccount) {
+  if (!item) return ""
+  var parts = []
+  var description = cleanText(item.description || "")
+  var account = cleanText(item.accountName || "")
+  if (description !== "") parts.push(description)
+  if (showAccount === true && account !== "") parts.push(account)
+  return parts.join(" • ")
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,
+    parseProjects: parseProjects,
     sortNotifications: sortNotifications,
+    sortProjects: sortProjects,
     filterNotifications: filterNotifications,
+    filterProjects: filterProjects,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
     cleanText: cleanText,
     notificationTime: notificationTime,
-    notificationMeta: notificationMeta
+    notificationMeta: notificationMeta,
+    projectMeta: projectMeta
   }
 }
