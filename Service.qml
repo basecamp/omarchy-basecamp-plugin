@@ -9,8 +9,10 @@ Item {
   property var settings: ({})
   property bool refreshing: false
   property bool installed: true
+  property bool supported: true
   property bool authenticated: true
   property bool probed: false
+  property string cliVersion: ""
   property var accounts: []
   property var notifications: []
   property int unreadCount: 0
@@ -79,16 +81,43 @@ Item {
 
   function finishProbe(stdout) {
     probed = true
-    if (stdout.trim() === "missing") {
+    var text = String(stdout || "")
+    if (text.trim() === "missing") {
       installed = false
+      supported = true
+      cliVersion = ""
       refreshing = false
       return
     }
     installed = true
+    supported = true
+    cliVersion = ""
+
+    var separator = text.indexOf("\n")
+    var versionPrefix = "basecamp-version:"
+    if (separator < 0 || text.indexOf(versionPrefix) !== 0) {
+      lastError = "Could not determine the Basecamp CLI version"
+      refreshing = false
+      return
+    }
+
+    var parsedVersion = Model.parseCliVersion(text.substring(versionPrefix.length, separator))
+    if (!parsedVersion.ok) {
+      lastError = parsedVersion.error
+      refreshing = false
+      return
+    }
+    cliVersion = parsedVersion.version
+    supported = parsedVersion.supported
+    if (!supported) {
+      refreshing = false
+      return
+    }
+
     // Only a well-formed `auth status` success is authoritative for the
     // authenticated flag. Errors and garbage get the error line instead —
     // telling the user to log in can't fix those.
-    var result = Model.parseJson(stdout)
+    var result = Model.parseJson(text.substring(separator + 1))
     if (!result.ok || !result.value.data) {
       lastError = conciseError("Could not check the Basecamp CLI: " + (result.error || "unexpected response"))
       refreshing = false
@@ -224,7 +253,7 @@ Item {
     running: false
     // bash always exists, so `exited` always fires — a bare `basecamp`
     // command would silently never exit when the binary is missing.
-    command: ["bash", "-c", "command -v basecamp >/dev/null 2>&1 || { echo missing; exit 0; }; basecamp auth status --json"]
+    command: ["bash", "-c", "command -v basecamp >/dev/null 2>&1 || { echo missing; exit 0; }; version=$(basecamp version) || exit $?; printf 'basecamp-version:%s\\n' \"$version\"; basecamp auth status --json"]
     stdout: StdioCollector {
       id: probeStdout
       waitForEnd: true

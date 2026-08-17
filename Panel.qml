@@ -99,8 +99,22 @@ Panel {
     return "No previous notifications."
   }
 
-  readonly property bool needsSetup: service.probed && (!service.installed || !service.authenticated)
-  readonly property string setupCommand: service.installed ? "basecamp auth login" : "omarchy pkg add basecamp-cli"
+  readonly property bool needsSetup: service.probed && (!service.installed || !service.supported || !service.authenticated)
+  readonly property string setupCommand: {
+    if (!service.installed) return "omarchy pkg add basecamp-cli"
+    if (!service.supported) return "omarchy update"
+    return "basecamp auth login"
+  }
+  readonly property string setupTitle: {
+    if (!service.installed) return "Basecamp CLI is required"
+    if (!service.supported) return "Basecamp CLI 0.9 or newer is required"
+    return "Please sign in"
+  }
+  readonly property string setupHint: {
+    if (!service.installed) return "Press R to retry after install completes."
+    if (!service.supported) return "Press R to retry after the update completes."
+    return "After you authenticate, press R to retry."
+  }
 
   function typeColor(type) {
     var value = String(type || "").toLowerCase()
@@ -464,7 +478,7 @@ Panel {
 
               Text {
                 width: parent.width
-                text: service.installed ? "Please sign in" : "Basecamp CLI is required"
+                text: root.setupTitle
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -523,7 +537,7 @@ Panel {
 
               Text {
                 width: parent.width
-                text: service.installed ? "After you authenticate, press R to retry." : "Press R to retry after install completes."
+                text: root.setupHint
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall

@@ -35,6 +35,13 @@ function withState(run) {
 
 test("demo CLI fixtures follow the production account and notification contracts", () => {
   withState(stateDir => {
+    const version = demo(["version"], stateDir)
+    assert.equal(version.status, 0, version.stderr)
+    assert.equal(version.stdout.trim(), "basecamp version 0.9.1")
+
+    const auth = successfulJson(["auth", "status", "--json"], stateDir)
+    assert.equal(auth.data.authenticated, true)
+
     const accountsResult = successfulJson(["accounts", "list", "--json"], stateDir)
     const parsedAccounts = Model.parseAccounts(JSON.stringify(accountsResult))
     assert.equal(parsedAccounts.ok, true)

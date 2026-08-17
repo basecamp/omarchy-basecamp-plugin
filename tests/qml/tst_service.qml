@@ -42,6 +42,10 @@ TestCase {
     return null
   }
 
+  function probeOutput(authOutput, version) {
+    return "basecamp-version:basecamp version " + String(version || "0.9.1") + "\n" + String(authOutput || "")
+  }
+
   function findAccountsProcess() {
     for (var i = 0; i < ProcessRegistry.processes.length; i++) {
       var process = ProcessRegistry.processes[i]
@@ -128,7 +132,7 @@ TestCase {
 
   function test_unauthenticated_probe_stops_refreshing() {
     service.refresh()
-    findProbeProcess().complete(0, '{"ok":true,"data":{"authenticated":false},"summary":"Not authenticated"}', "")
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":false},"summary":"Not authenticated"}'), "")
     compare(service.probed, true)
     compare(service.installed, true)
     compare(service.authenticated, false)
@@ -137,7 +141,7 @@ TestCase {
 
   function test_authenticated_probe_proceeds_to_accounts() {
     service.refresh()
-    findProbeProcess().complete(0, '{"ok":true,"data":{"authenticated":true,"expired":false}}', "")
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true,"expired":false}}'), "")
     compare(service.authenticated, true)
     var accounts = findAccountsProcess()
     verify(accounts !== null)
@@ -146,7 +150,7 @@ TestCase {
 
   function test_auth_required_error_during_refresh_flips_authenticated() {
     service.refresh()
-    findProbeProcess().complete(0, '{"ok":true,"data":{"authenticated":true}}', "")
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
     var accounts = findAccountsProcess()
     verify(accounts !== null)
     accounts.complete(3, '{"ok":false,"error":"Not authenticated. Run: basecamp auth login","code":"auth_required","hint":"Run: basecamp auth login"}', "")
@@ -155,9 +159,20 @@ TestCase {
     compare(service.lastError, "")
   }
 
+  function test_outdated_cli_stops_refreshing_and_flags_unsupported() {
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}', "0.8.1"), "")
+    compare(service.probed, true)
+    compare(service.installed, true)
+    compare(service.supported, false)
+    compare(service.cliVersion, "0.8.1")
+    compare(service.refreshing, false)
+    compare(findAccountsProcess(), null)
+  }
+
   function test_garbage_probe_output_reports_error_not_signin() {
     service.refresh()
-    findProbeProcess().complete(0, "not json at all", "")
+    findProbeProcess().complete(0, probeOutput("not json at all"), "")
     compare(service.probed, true)
     compare(service.installed, true)
     compare(service.authenticated, true)
@@ -168,7 +183,7 @@ TestCase {
 
   function test_error_envelope_probe_output_reports_error_not_signin() {
     service.refresh()
-    findProbeProcess().complete(0, '{"ok":false,"error":"Config file is corrupt","code":"config"}', "")
+    findProbeProcess().complete(0, probeOutput('{"ok":false,"error":"Config file is corrupt","code":"config"}'), "")
     compare(service.authenticated, true)
     verify(service.lastError.indexOf("Config file is corrupt") !== -1)
     compare(service.refreshing, false)
@@ -177,7 +192,7 @@ TestCase {
 
   function test_auth_required_mid_fetch_stops_the_refresh() {
     service.refresh()
-    findProbeProcess().complete(0, '{"ok":true,"data":{"authenticated":true}}', "")
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
     findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":1,"name":"One"},{"id":2,"name":"Two"}]}', "")
 
     var notificationList = findNotificationListProcess()
@@ -199,7 +214,7 @@ TestCase {
     service.refresh()
     var probe = findProbeProcess()
     verify(probe !== null)
-    probe.complete(0, '{"ok":true,"data":{"authenticated":true}}', "")
+    probe.complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
     compare(service.installed, true)
     compare(service.authenticated, true)
     verify(findAccountsProcess().running)
