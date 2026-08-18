@@ -18,8 +18,8 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 ## Requirements
 
 - Omarchy with Quickshell plugin support.
-- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) with the `accounts` and `notifications` commands.
-- A Basecamp CLI login with full access. Read-only OAuth access cannot mark notifications as read.
+- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) 0.9 or newer.
+- A full-access Basecamp CLI login. Version 0.9 and newer requests full access by default; read-only logins can view notifications but cannot mark them as read.
 
 Install the Basecamp CLI on Omarchy:
 
@@ -30,7 +30,7 @@ omarchy pkg add basecamp-cli
 Authenticate and confirm that the CLI can see your accounts:
 
 ```bash
-basecamp auth login --scope full
+basecamp auth login
 basecamp accounts list
 basecamp notifications list
 ```
@@ -121,6 +121,8 @@ Removing the plugin does not remove the Basecamp CLI or change its stored accoun
 The plugin runs these local CLI commands:
 
 ```text
+basecamp version
+basecamp auth status --json
 basecamp accounts list --json
 basecamp notifications list --account <account-id> --json
 basecamp notifications read <notification-id> --account <account-id> --json

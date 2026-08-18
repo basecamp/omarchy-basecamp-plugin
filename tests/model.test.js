@@ -20,6 +20,34 @@ function payload(data) {
   return JSON.stringify({ data })
 }
 
+test("parseCliVersion requires Basecamp CLI 0.9 or newer", () => {
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.8.1"), {
+    ok: true,
+    error: "",
+    version: "0.8.1",
+    supported: false
+  })
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.0").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.10.0").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 1.0.0").supported, true)
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.0+linux.x86-64"), {
+    ok: true,
+    error: "",
+    version: "0.9.0+linux.x86-64",
+    supported: true
+  })
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.1+linux.x86-64"), {
+    ok: true,
+    error: "",
+    version: "0.9.1+linux.x86-64",
+    supported: true
+  })
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.0-rc.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.1-rc.1").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 1.0.0-rc.1").supported, true)
+  assert.equal(Model.parseCliVersion("unexpected output").ok, false)
+})
+
 test("parseAccounts normalizes valid accounts and skips missing ids", () => {
   const result = Model.parseAccounts(payload([
     { id: 42, name: "Main &amp; Co" },
