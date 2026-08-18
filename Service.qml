@@ -98,6 +98,7 @@ Item {
     var separator = text.indexOf("\n")
     var versionPrefix = "basecamp-version:"
     if (separator < 0 || text.indexOf(versionPrefix) !== 0) {
+      authenticated = true
       lastError = "Could not determine the Basecamp CLI version"
       refreshing = false
       return
@@ -105,6 +106,7 @@ Item {
 
     var parsedVersion = Model.parseCliVersion(text.substring(versionPrefix.length, separator))
     if (!parsedVersion.ok) {
+      authenticated = true
       lastError = parsedVersion.error
       refreshing = false
       return
@@ -121,6 +123,7 @@ Item {
     // telling the user to log in can't fix those.
     var result = Model.parseJson(text.substring(separator + 1))
     if (!result.ok || !result.value.data) {
+      authenticated = true
       lastError = conciseError("Could not check the Basecamp CLI: " + (result.error || "unexpected response"))
       refreshing = false
       return

@@ -30,6 +30,12 @@ test("parseCliVersion requires Basecamp CLI 0.9 or newer", () => {
   assert.equal(Model.parseCliVersion("basecamp version 0.9.0").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 0.10.0").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 1.0.0").supported, true)
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.0+linux.x86-64"), {
+    ok: true,
+    error: "",
+    version: "0.9.0+linux.x86-64",
+    supported: true
+  })
   assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.1+linux.x86-64"), {
     ok: true,
     error: "",
@@ -37,6 +43,8 @@ test("parseCliVersion requires Basecamp CLI 0.9 or newer", () => {
     supported: true
   })
   assert.equal(Model.parseCliVersion("basecamp version 0.9.0-rc.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.1-rc.1").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 1.0.0-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("unexpected output").ok, false)
 })
 

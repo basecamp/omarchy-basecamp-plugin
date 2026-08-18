@@ -172,11 +172,13 @@ TestCase {
   }
 
   function test_blank_cli_version_reports_error() {
+    service.authenticated = false
     service.refresh()
     findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}', ""), "")
     compare(service.probed, true)
     compare(service.installed, true)
     compare(service.supported, true)
+    compare(service.authenticated, true)
     compare(service.cliVersion, "")
     compare(service.lastError, "Could not determine the Basecamp CLI version")
     compare(service.refreshing, false)
@@ -195,6 +197,7 @@ TestCase {
   }
 
   function test_error_envelope_probe_output_reports_error_not_signin() {
+    service.authenticated = false
     service.refresh()
     findProbeProcess().complete(0, probeOutput('{"ok":false,"error":"Config file is corrupt","code":"config"}'), "")
     compare(service.authenticated, true)
