@@ -19,7 +19,7 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 
 - Omarchy with Quickshell plugin support.
 - [Basecamp CLI](https://github.com/basecamp/basecamp-cli) 0.9 or newer.
-- A Basecamp CLI login with full access. Read-only OAuth access cannot mark notifications as read.
+- A full-access Basecamp CLI login. Version 0.9 and newer requests full access by default; read-only logins can view notifications but cannot mark them as read.
 
 Install the Basecamp CLI on Omarchy:
 
