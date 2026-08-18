@@ -93,6 +93,8 @@ Item {
     supported = true
     cliVersion = ""
 
+    // Probe stdout starts with `basecamp-version:<basecamp version output>`;
+    // the remaining lines contain the `auth status --json` response.
     var separator = text.indexOf("\n")
     var versionPrefix = "basecamp-version:"
     if (separator < 0 || text.indexOf(versionPrefix) !== 0) {

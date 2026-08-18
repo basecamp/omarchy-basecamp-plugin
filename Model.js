@@ -1,19 +1,20 @@
 function parseCliVersion(raw) {
   var text = String(raw || "").trim()
-  var match = text.match(/^basecamp version v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/)
+  var match = text.match(/^basecamp version v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/)
   if (!match) return { ok: false, error: "Could not determine the Basecamp CLI version", version: "", supported: false }
 
   var major = parseInt(match[1], 10)
   var minor = parseInt(match[2], 10)
   var patch = parseInt(match[3], 10)
   var prerelease = String(match[4] || "")
+  var buildMetadata = String(match[5] || "")
   var newerThanMinimum = major > 0 || minor > 9 || (minor === 9 && patch > 0)
   var minimumRelease = major === 0 && minor === 9 && patch === 0 && prerelease === ""
 
   return {
     ok: true,
     error: "",
-    version: major + "." + minor + "." + patch + prerelease,
+    version: major + "." + minor + "." + patch + prerelease + buildMetadata,
     supported: newerThanMinimum || minimumRelease
   }
 }

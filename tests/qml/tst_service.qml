@@ -43,7 +43,8 @@ TestCase {
   }
 
   function probeOutput(authOutput, version) {
-    return "basecamp-version:basecamp version " + String(version || "0.9.1") + "\n" + String(authOutput || "")
+    var cliVersion = version === undefined ? "0.9.1" : version
+    return "basecamp-version:basecamp version " + String(cliVersion) + "\n" + String(authOutput || "")
   }
 
   function findAccountsProcess() {
@@ -166,6 +167,18 @@ TestCase {
     compare(service.installed, true)
     compare(service.supported, false)
     compare(service.cliVersion, "0.8.1")
+    compare(service.refreshing, false)
+    compare(findAccountsProcess(), null)
+  }
+
+  function test_blank_cli_version_reports_error() {
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}', ""), "")
+    compare(service.probed, true)
+    compare(service.installed, true)
+    compare(service.supported, true)
+    compare(service.cliVersion, "")
+    compare(service.lastError, "Could not determine the Basecamp CLI version")
     compare(service.refreshing, false)
     compare(findAccountsProcess(), null)
   }
