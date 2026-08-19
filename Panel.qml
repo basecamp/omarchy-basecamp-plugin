@@ -673,18 +673,43 @@ Panel {
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: Style.space(2)
                     Layout.preferredHeight: Style.space(16)
-                    Layout.preferredWidth: Math.max(Style.space(16), rowBadgeText.implicitWidth + Style.space(8))
+                    Layout.preferredWidth: Math.max(Style.space(16), badgeCountMetrics.width + Style.space(8))
                     radius: Style.space(8)
                     color: root.urgent
+
+                    TextMetrics {
+                      id: badgeCountMetrics
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      text: Model.notificationBadgeText(notificationRow.modelData, false)
+                    }
 
                     Text {
                       id: rowBadgeText
                       anchors.centerIn: parent
-                      text: String(Math.max(1, notificationRow.modelData.unreadCount || 0))
+                      text: Model.notificationBadgeText(notificationRow.modelData, dismissMouse.containsMouse)
                       color: Color.background
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                       font.bold: true
+                    }
+
+                    MouseArea {
+                      id: dismissMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onPositionChanged: function(mouse) {
+                        if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
+                      }
+                      onClicked: service.markRead(notificationRow.modelData)
+                    }
+
+                    PanelToolTip {
+                      visible: dismissMouse.containsMouse
+                      text: "Dismiss"
+                      fontFamily: root.fontFamily
                     }
                   }
                 }

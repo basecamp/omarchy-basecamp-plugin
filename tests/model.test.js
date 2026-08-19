@@ -125,6 +125,17 @@ test("notificationMeta includes account context only when requested", () => {
   assert.equal(Model.notificationMeta(item, 0, true), "Alice • Project (Main)")
 })
 
+test("notificationBadgeText shows the unread count until hovered, then a dismiss glyph", () => {
+  assert.equal(Model.notificationBadgeText({ unreadCount: 3 }, false), "3")
+  assert.equal(Model.notificationBadgeText({}, false), "1")
+  assert.equal(Model.notificationBadgeText({ unreadCount: 0 }, false), "1")
+
+  const dismiss = Model.notificationBadgeText({ unreadCount: 3 }, true)
+  assert.notEqual(dismiss, "3")
+  assert.equal(dismiss, Model.notificationBadgeText({ unreadCount: 1 }, true))
+  assert.equal(dismiss, Model.notificationBadgeText({}, true))
+})
+
 test("invalid CLI output returns a useful parse failure", () => {
   assert.deepEqual(Model.parseAccounts("not json"), {
     ok: false,
