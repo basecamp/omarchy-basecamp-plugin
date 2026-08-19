@@ -185,6 +185,18 @@ TestCase {
     compare(findAccountsProcess(), null)
   }
 
+  function test_probe_error_flag_sets_and_clears_across_probes() {
+    service.refresh()
+    findProbeProcess().complete(0, "garbage without version prefix\nmore garbage", "")
+    compare(service.probeError, true)
+    compare(service.refreshing, false)
+
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    compare(service.probeError, false)
+    compare(service.authenticated, true)
+  }
+
   function test_garbage_probe_output_reports_error_not_signin() {
     service.refresh()
     findProbeProcess().complete(0, probeOutput("not json at all"), "")

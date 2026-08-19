@@ -19,6 +19,34 @@ function parseCliVersion(raw) {
   }
 }
 
+// One place for the setup-state UI contract: which state wins (missing CLI
+// beats outdated beats signed-out), the user-facing strings, and the exact
+// shell command the panel launches in a floating terminal. The launch
+// command preserves the fix's exit status through the IPC refresh so the
+// terminal presentation can honor Ctrl-C (exit 130) from the fix itself.
+function setupPlan(installed, supported, authenticated, ipcTarget) {
+  var plan = {
+    needed: installed !== true || supported !== true || authenticated !== true,
+    title: "Please sign in",
+    command: "basecamp auth login",
+    buttonLabel: "Sign in to Basecamp…",
+    fix: "basecamp auth login"
+  }
+  if (installed !== true) {
+    plan.title = "Basecamp CLI is required"
+    plan.command = "omarchy pkg add basecamp-cli"
+    plan.buttonLabel = "Install Basecamp CLI…"
+    plan.fix = "omarchy-pkg-add basecamp-cli && basecamp auth login"
+  } else if (supported !== true) {
+    plan.title = "Basecamp CLI 0.9 or newer is required"
+    plan.command = "omarchy update"
+    plan.buttonLabel = "Update Omarchy…"
+    plan.fix = "omarchy update"
+  }
+  plan.launchCommand = plan.fix + "; rc=$?; omarchy-shell -q " + String(ipcTarget || "") + " refresh; (exit $rc)"
+  return plan
+}
+
 function parseJson(raw) {
   var text = String(raw || "").trim()
   if (text === "") return { ok: false, error: "The Basecamp CLI returned no data", code: "" }
@@ -266,6 +294,7 @@ function notificationMeta(item, nowMs, showAccount) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    setupPlan: setupPlan,
     parseCliVersion: parseCliVersion,
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,

@@ -57,7 +57,9 @@ Panel {
     "Roasting marshmallows",
     "Climbing the hill chart"
   ]
-  readonly property bool rotatingPhrases: service.refreshing
+  // Guard on needsSetup: the setup-state retry timer probes every few
+  // seconds, and each probe would otherwise flash a loading phrase.
+  readonly property bool rotatingPhrases: service.refreshing && !needsSetup
 
   readonly property string heroStatusText: {
     if (service.actionStatus !== "") return service.actionStatus
@@ -99,21 +101,23 @@ Panel {
     return "No previous notifications."
   }
 
-  readonly property bool needsSetup: service.probed && (!service.installed || !service.supported || !service.authenticated)
-  readonly property string setupCommand: {
-    if (!service.installed) return "omarchy pkg add basecamp-cli"
-    if (!service.supported) return "omarchy update"
-    return "basecamp auth login"
-  }
-  readonly property string setupTitle: {
-    if (!service.installed) return "Basecamp CLI is required"
-    if (!service.supported) return "Basecamp CLI 0.9 or newer is required"
-    return "Please sign in"
-  }
-  readonly property string setupHint: {
-    if (!service.installed) return "Press R to retry after install completes."
-    if (!service.supported) return "Press R to retry after the update completes."
-    return "After you authenticate, press R to retry."
+  readonly property var setupPlan: Model.setupPlan(service.installed, service.supported, service.authenticated, ipcTarget)
+  readonly property bool needsSetup: service.probed && setupPlan.needed
+
+  // Debounce relaunches: the flow's terminal may still be running (auth
+  // login waits on the browser), and a second concurrent run would fight
+  // the first over credentials. Cleared when setup resolves.
+  property double setupLaunchedMs: 0
+  onNeedsSetupChanged: if (!needsSetup) setupLaunchedMs = 0
+
+  // The launched flow pings back over IPC when it exits cleanly; the retry
+  // timer and reopen-refresh cover interrupted or out-of-band fixes.
+  function launchSetup() {
+    if (!bar) return
+    if (setupLaunchedMs > 0 && Date.now() - setupLaunchedMs < 30000) return
+    setupLaunchedMs = Date.now()
+    bar.run("omarchy-launch-floating-terminal-with-presentation " + Util.shellQuote(setupPlan.launchCommand))
+    close()
   }
 
   function typeColor(type) {
@@ -211,6 +215,16 @@ Panel {
   PointerMoveGate {
     id: pointerGate
     referenceItem: panelFlick
+  }
+
+  // Auto-retry while a setup state is showing: each tick is one local
+  // `auth status` probe, so the panel recovers on its own once the user
+  // finishes installing or signing in.
+  Timer {
+    interval: 3000
+    repeat: true
+    running: root.opened && (root.needsSetup || service.probeError)
+    onTriggered: service.refresh()
   }
 
   Service {
@@ -478,12 +492,26 @@ Panel {
 
               Text {
                 width: parent.width
-                text: root.setupTitle
+                text: root.setupPlan.title
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
+              }
+
+              Button {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.setupPlan.buttonLabel
+                bordered: true
+                foreground: root.foreground
+                background: Color.popups.background
+                accent: Color.accent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.body
+                horizontalPadding: Style.spacing.controlPaddingX
+                verticalPadding: Style.spacing.controlPaddingY
+                onClicked: root.launchSetup()
               }
 
               Item {
@@ -496,11 +524,10 @@ Panel {
                   spacing: Style.space(6)
 
                   Text {
-                    text: root.setupCommand
-                    color: root.foreground
+                    text: "or run: " + root.setupPlan.command
+                    color: root.dim
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
+                    font.pixelSize: Style.font.bodySmall
                   }
 
                   Text {
@@ -508,7 +535,7 @@ Panel {
                     text: "󰆏"
                     color: root.dim
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
+                    font.pixelSize: Style.font.bodySmall
                   }
                 }
 
@@ -518,7 +545,7 @@ Panel {
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
-                    Quickshell.execDetached(["bash", "-c", "printf %s " + Util.shellQuote(root.setupCommand) + " | wl-copy"])
+                    Quickshell.execDetached(["bash", "-c", "printf %s " + Util.shellQuote(root.setupPlan.command) + " | wl-copy"])
                     setupCopiedTimer.restart()
                   }
                 }
@@ -533,15 +560,6 @@ Panel {
                   id: setupCopiedTimer
                   interval: 1500
                 }
-              }
-
-              Text {
-                width: parent.width
-                text: root.setupHint
-                color: root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                horizontalAlignment: Text.AlignHCenter
               }
             }
 

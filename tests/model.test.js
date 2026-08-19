@@ -143,3 +143,30 @@ test("invalid CLI output returns a useful parse failure", () => {
     accounts: []
   })
 })
+
+test("setupPlan maps each setup state to its fix, worst problem first", () => {
+  const signIn = Model.setupPlan(true, true, false, "37signals.basecamp")
+  assert.equal(signIn.needed, true)
+  assert.equal(signIn.title, "Please sign in")
+  assert.equal(signIn.buttonLabel, "Sign in to Basecamp…")
+  assert.equal(signIn.command, "basecamp auth login")
+  assert.equal(signIn.launchCommand,
+    "basecamp auth login; rc=$?; omarchy-shell -q 37signals.basecamp refresh; (exit $rc)")
+
+  const install = Model.setupPlan(false, true, true, "37signals.basecamp")
+  assert.equal(install.title, "Basecamp CLI is required")
+  assert.equal(install.buttonLabel, "Install Basecamp CLI…")
+  assert.equal(install.command, "omarchy pkg add basecamp-cli")
+  assert.equal(install.launchCommand,
+    "omarchy-pkg-add basecamp-cli && basecamp auth login; rc=$?; omarchy-shell -q 37signals.basecamp refresh; (exit $rc)")
+
+  const update = Model.setupPlan(true, false, true, "37signals.basecamp")
+  assert.equal(update.title, "Basecamp CLI 0.9 or newer is required")
+  assert.equal(update.buttonLabel, "Update Omarchy…")
+  assert.equal(update.command, "omarchy update")
+  assert.equal(update.launchCommand,
+    "omarchy update; rc=$?; omarchy-shell -q 37signals.basecamp refresh; (exit $rc)")
+
+  assert.equal(Model.setupPlan(false, false, false, "t").title, "Basecamp CLI is required")
+  assert.equal(Model.setupPlan(true, true, true, "t").needed, false)
+})
