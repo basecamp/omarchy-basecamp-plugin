@@ -673,7 +673,7 @@ Panel {
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: Style.space(2)
                     Layout.preferredHeight: Style.space(16)
-                    Layout.preferredWidth: Math.max(Style.space(16), badgeCountMetrics.width + Style.space(8))
+                    Layout.preferredWidth: Math.max(Style.space(16), Math.max(badgeCountMetrics.width, badgeGlyphMetrics.width) + Style.space(8))
                     radius: Style.space(8)
                     color: root.urgent
 
@@ -683,6 +683,14 @@ Panel {
                       font.pixelSize: Style.font.caption
                       font.bold: true
                       text: Model.notificationBadgeText(notificationRow.modelData, false)
+                    }
+
+                    TextMetrics {
+                      id: badgeGlyphMetrics
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      text: Model.notificationBadgeText(notificationRow.modelData, true)
                     }
 
                     Text {
@@ -704,12 +712,6 @@ Panel {
                         if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
                       }
                       onClicked: service.markRead(notificationRow.modelData)
-                    }
-
-                    PanelToolTip {
-                      visible: dismissMouse.containsMouse
-                      text: "Dismiss"
-                      fontFamily: root.fontFamily
                     }
                   }
                 }

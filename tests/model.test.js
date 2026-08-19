@@ -131,7 +131,7 @@ test("notificationBadgeText shows the unread count until hovered, then a dismiss
   assert.equal(Model.notificationBadgeText({ unreadCount: 0 }, false), "1")
 
   const dismiss = Model.notificationBadgeText({ unreadCount: 3 }, true)
-  assert.notEqual(dismiss, "3")
+  assert.equal(dismiss, "󰅖")
   assert.equal(dismiss, Model.notificationBadgeText({ unreadCount: 1 }, true))
   assert.equal(dismiss, Model.notificationBadgeText({}, true))
 })
