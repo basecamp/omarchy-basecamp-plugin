@@ -203,6 +203,11 @@ function notificationTypeIcon(type) {
   return "󰍡"                               // md-message
 }
 
+function notificationBadgeText(item, hovered) {
+  if (hovered) return "󰅖"  // md-close
+  return String(Math.max(1, (item && item.unreadCount) || 0))
+}
+
 function cleanText(value) {
   return String(value || "")
     .replace(/\\[nrt]/g, " ")
@@ -268,6 +273,7 @@ if (typeof module !== "undefined") {
     filterNotifications: filterNotifications,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
+    notificationBadgeText: notificationBadgeText,
     cleanText: cleanText,
     notificationTime: notificationTime,
     notificationMeta: notificationMeta

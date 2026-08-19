@@ -12,6 +12,7 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Filters notifications by account or between unread and all items.
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
+- Dismisses an unread notification from its count badge without opening it.
 - Changes the bar logo color when unread notifications exist.
 - Polls every 10 minutes. Right-click or middle-click the bar logo to refresh immediately.
 
@@ -62,6 +63,7 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Select an account to filter the combined feed.
 - Select `Unread` or `All` below the Basecamp title.
 - Click a notification to open it. Unread notifications are also marked as read.
+- Hover the unread count on a notification to reveal a dismiss control. Click it to mark the item as read without opening it.
 - Use the up and down arrow keys to move through notifications.
 - Use the left and right arrow keys to move through account filters.
 - Press `U` for unread notifications, `A` for all notifications, or `R` to refresh.
