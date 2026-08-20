@@ -104,18 +104,13 @@ Panel {
   readonly property var setupPlan: Model.setupPlan(service.installed, service.supported, service.authenticated, ipcTarget)
   readonly property bool needsSetup: service.probed && setupPlan.needed
 
-  // Debounce relaunches: the flow's terminal may still be running (auth
-  // login waits on the browser), and a second concurrent run would fight
-  // the first over credentials. Cleared when setup resolves.
-  property double setupLaunchedMs: 0
-  onNeedsSetupChanged: if (!needsSetup) setupLaunchedMs = 0
+  // Keep one setup flow active until its command reports completion. This
+  // prevents a second browser login regardless of how long authentication
+  // takes, while permitting an immediate retry after failure.
+  onNeedsSetupChanged: if (!needsSetup) service.finishSetup()
 
-  // The launched flow pings back over IPC when it exits cleanly; the retry
-  // timer and reopen-refresh cover interrupted or out-of-band fixes.
   function launchSetup() {
-    if (!bar) return
-    if (setupLaunchedMs > 0 && Date.now() - setupLaunchedMs < 30000) return
-    setupLaunchedMs = Date.now()
+    if (!bar || !service.tryStartSetup()) return
     bar.run("omarchy-launch-floating-terminal-with-presentation " + Util.shellQuote(setupPlan.launchCommand))
     close()
   }
@@ -274,6 +269,11 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { service.refresh(); return "ok" }
+    function setupFinished(): string {
+      service.finishSetup()
+      service.refresh()
+      return "ok"
+    }
     function unread(): int { return service.unreadCount }
     function status(): string {
       return JSON.stringify({

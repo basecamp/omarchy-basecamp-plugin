@@ -12,6 +12,7 @@ Item {
   property bool supported: true
   property bool authenticated: true
   property bool probed: false
+  property bool setupRunning: false
   // True when the probe itself failed (unreadable version or auth status) —
   // distinct from setup states, so the panel can keep retrying: a transient
   // failure mid-install/mid-login must not strand a stuck error.
@@ -62,6 +63,16 @@ Item {
   function refreshIfStale() {
     var updatedAt = lastUpdated instanceof Date ? lastUpdated.getTime() : 0
     if (updatedAt <= 0 || Date.now() - updatedAt >= refreshIntervalSec * 1000) refresh()
+  }
+
+  function tryStartSetup() {
+    if (setupRunning) return false
+    setupRunning = true
+    return true
+  }
+
+  function finishSetup() {
+    setupRunning = false
   }
 
   function refresh() {

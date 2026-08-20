@@ -43,7 +43,7 @@ function setupPlan(installed, supported, authenticated, ipcTarget) {
     plan.buttonLabel = "Update Omarchy…"
     plan.fix = "omarchy update"
   }
-  plan.launchCommand = plan.fix + "; rc=$?; omarchy-shell -q " + String(ipcTarget || "") + " refresh; (exit $rc)"
+  plan.launchCommand = plan.fix + "; rc=$?; omarchy-shell -q " + String(ipcTarget || "") + " setupFinished; (exit $rc)"
   return plan
 }
 

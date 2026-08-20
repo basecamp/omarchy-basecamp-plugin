@@ -197,6 +197,20 @@ TestCase {
     compare(service.authenticated, true)
   }
 
+  function test_setup_stays_running_until_completion() {
+    verify(service.tryStartSetup())
+    compare(service.setupRunning, true)
+
+    wait(50)
+    verify(!service.tryStartSetup())
+    compare(service.setupRunning, true)
+
+    service.finishSetup()
+    compare(service.setupRunning, false)
+    verify(service.tryStartSetup())
+    compare(service.setupRunning, true)
+  }
+
   function test_garbage_probe_output_reports_error_not_signin() {
     service.refresh()
     findProbeProcess().complete(0, probeOutput("not json at all"), "")
