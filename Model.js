@@ -19,6 +19,54 @@ function parseCliVersion(raw) {
   }
 }
 
+// One place for the setup-state UI contract: which state wins (missing CLI
+// beats outdated beats signed-out), the user-facing strings, and the exact
+// shell command the panel launches in a floating terminal. The launch
+// command preserves the fix's exit status through the IPC refresh so the
+// terminal presentation can honor Ctrl-C (exit 130) from the fix itself.
+var setupLockFilename = "37signals.basecamp.setup.lock"
+
+function setupLockPath(runtimeDir) {
+  return String(runtimeDir || "/tmp").replace(/\/+$/, "") + "/" + setupLockFilename
+}
+
+function shellQuote(value) {
+  return "'" + String(value || "").replace(/'/g, "'\\''") + "'"
+}
+
+function setupLaunchCommand(fix, ipcTarget) {
+  var target = shellQuote(ipcTarget)
+  var completion = "omarchy-shell -q \"$target\" setupFinished"
+  return "target=" + target + "; lock=\"${XDG_RUNTIME_DIR:-/tmp}/" + setupLockFilename + "\"; "
+    + "( flock -n 9 || { printf '%s\\n' 'Basecamp setup is already running.'; exit 75; }; "
+    + "trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; "
+    + "trap 'rc=$?; trap - EXIT; flock -u 9; " + completion + "; exit $rc' EXIT; "
+    + String(fix || "") + " ) 9>\"$lock\""
+}
+
+function setupPlan(installed, supported, authenticated, ipcTarget) {
+  var plan = {
+    needed: installed !== true || supported !== true || authenticated !== true,
+    title: "Please sign in",
+    command: "basecamp auth login",
+    buttonLabel: "Sign in to Basecamp…",
+    fix: "basecamp auth login"
+  }
+  if (installed !== true) {
+    plan.title = "Basecamp CLI is required"
+    plan.command = "omarchy pkg add basecamp-cli"
+    plan.buttonLabel = "Install Basecamp CLI…"
+    plan.fix = "omarchy-pkg-add basecamp-cli && basecamp auth login"
+  } else if (supported !== true) {
+    plan.title = "Basecamp CLI 0.9 or newer is required"
+    plan.command = "omarchy update"
+    plan.buttonLabel = "Update Omarchy…"
+    plan.fix = "omarchy update"
+  }
+  plan.launchCommand = setupLaunchCommand(plan.fix, ipcTarget)
+  return plan
+}
+
 function parseJson(raw) {
   var text = String(raw || "").trim()
   if (text === "") return { ok: false, error: "The Basecamp CLI returned no data", code: "" }
@@ -266,6 +314,9 @@ function notificationMeta(item, nowMs, showAccount) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    setupLockPath: setupLockPath,
+    setupLaunchCommand: setupLaunchCommand,
+    setupPlan: setupPlan,
     parseCliVersion: parseCliVersion,
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,

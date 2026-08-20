@@ -42,6 +42,14 @@ TestCase {
     return null
   }
 
+  function findSetupLockProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length > 0 && process.command[0] === "flock") return process
+    }
+    return null
+  }
+
   function probeOutput(authOutput, version) {
     var cliVersion = version === undefined ? "0.9.1" : version
     return "basecamp-version:basecamp version " + String(cliVersion) + "\n" + String(authOutput || "")
@@ -183,6 +191,55 @@ TestCase {
     compare(service.lastError, "Could not determine the Basecamp CLI version")
     compare(service.refreshing, false)
     compare(findAccountsProcess(), null)
+  }
+
+  function test_probe_error_flag_sets_and_clears_across_probes() {
+    service.refresh()
+    findProbeProcess().complete(0, "garbage without version prefix\nmore garbage", "")
+    compare(service.probeError, true)
+    compare(service.refreshing, false)
+
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    compare(service.probeError, false)
+    compare(service.authenticated, true)
+  }
+
+  function test_setup_stays_running_until_completion() {
+    verify(service.tryStartSetup())
+    compare(service.setupRunning, true)
+
+    wait(50)
+    verify(!service.tryStartSetup())
+    compare(service.setupRunning, true)
+
+    service.finishSetup()
+    compare(service.setupRunning, false)
+    verify(service.tryStartSetup())
+    compare(service.setupRunning, true)
+  }
+
+  function test_setup_lock_check_recovers_stale_running_state() {
+    service.setupRunning = true
+    service.checkSetupRunning()
+
+    var process = findSetupLockProcess()
+    verify(process !== null)
+    compare(process.command, ["flock", "-n", "/tmp/37signals.basecamp.setup.lock", "true"])
+    verify(!service.tryStartSetup())
+
+    process.complete(0, "", "")
+    compare(service.setupRunning, false)
+    verify(service.tryStartSetup())
+  }
+
+  function test_setup_lock_check_detects_a_running_process() {
+    service.checkSetupRunning()
+
+    var process = findSetupLockProcess()
+    verify(process !== null)
+    process.complete(1, "", "")
+    compare(service.setupRunning, true)
   }
 
   function test_garbage_probe_output_reports_error_not_signin() {

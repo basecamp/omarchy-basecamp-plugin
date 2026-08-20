@@ -12,6 +12,13 @@ Item {
   property bool supported: true
   property bool authenticated: true
   property bool probed: false
+  property bool setupRunning: false
+  readonly property string setupLockPath: Model.setupLockPath(Quickshell.env("XDG_RUNTIME_DIR"))
+  readonly property bool setupChecking: setupLockProcess.running
+  // True when the probe itself failed (unreadable version or auth status) —
+  // distinct from setup states, so the panel can keep retrying: a transient
+  // failure mid-install/mid-login must not strand a stuck error.
+  property bool probeError: false
   property string cliVersion: ""
   property var accounts: []
   property var notifications: []
@@ -60,6 +67,20 @@ Item {
     if (updatedAt <= 0 || Date.now() - updatedAt >= refreshIntervalSec * 1000) refresh()
   }
 
+  function tryStartSetup() {
+    if (setupRunning || setupChecking) return false
+    setupRunning = true
+    return true
+  }
+
+  function finishSetup() {
+    setupRunning = false
+  }
+
+  function checkSetupRunning() {
+    if (!setupLockProcess.running) setupLockProcess.running = true
+  }
+
   function refresh() {
     if (refreshing || probeProcess.running || accountsProcess.running || notificationProcess.running) return
     refreshing = true
@@ -81,6 +102,7 @@ Item {
 
   function finishProbe(stdout) {
     probed = true
+    probeError = false
     var text = String(stdout || "")
     if (text.trim() === "missing") {
       installed = false
@@ -99,6 +121,7 @@ Item {
     var versionPrefix = "basecamp-version:"
     if (separator < 0 || text.indexOf(versionPrefix) !== 0) {
       authenticated = true
+      probeError = true
       lastError = "Could not determine the Basecamp CLI version"
       refreshing = false
       return
@@ -107,6 +130,7 @@ Item {
     var parsedVersion = Model.parseCliVersion(text.substring(versionPrefix.length, separator))
     if (!parsedVersion.ok) {
       authenticated = true
+      probeError = true
       lastError = parsedVersion.error
       refreshing = false
       return
@@ -124,6 +148,7 @@ Item {
     var result = Model.parseJson(text.substring(separator + 1))
     if (!result.ok || !result.value.data) {
       authenticated = true
+      probeError = true
       lastError = conciseError("Could not check the Basecamp CLI: " + (result.error || "unexpected response"))
       refreshing = false
       return
@@ -341,6 +366,17 @@ Item {
       }
       root._fetchIndex += 1
       root.fetchNextAccount()
+    }
+  }
+
+  Process {
+    id: setupLockProcess
+    running: false
+    command: ["flock", "-n", root.setupLockPath, "true"]
+    onExited: function(exitCode) {
+      // Exit 0 acquired the lock, so no setup process holds it. Any other
+      // result fails closed and keeps duplicate authentication blocked.
+      root.setupRunning = exitCode !== 0
     }
   }
 
