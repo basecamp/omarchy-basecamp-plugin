@@ -7,9 +7,11 @@
   "license": "MIT",
   "description": "Notifications from every Basecamp account available through the Basecamp CLI.",
   "kinds": [
+    "service",
     "bar-widget"
   ],
   "entryPoints": {
+    "service": "Service.qml",
     "barWidget": "Panel.qml"
   },
   "barWidget": {

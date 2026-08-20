@@ -13,6 +13,16 @@ TestCase {
     Service {}
   }
 
+  Component {
+    id: barViewComponent
+    QtObject {
+      property var service: null
+      readonly property int unreadCount: service ? service.unreadCount : -1
+      readonly property string accountFilter: service ? service.accountFilter : "missing"
+      readonly property string stateFilter: service ? service.stateFilter : "missing"
+    }
+  }
+
   function init() {
     service = serviceComponent.createObject(this)
     verify(service !== null)
@@ -291,5 +301,68 @@ TestCase {
     compare(service.installed, true)
     compare(service.authenticated, true)
     verify(findAccountsProcess().running)
+  }
+
+  function test_filters_default_to_all_accounts_and_unread() {
+    compare(service.accountFilter, "")
+    compare(service.stateFilter, "unread")
+  }
+
+  function test_two_bar_views_share_account_and_state_filters() {
+    var viewA = barViewComponent.createObject(this, { service: service })
+    var viewB = barViewComponent.createObject(this, { service: service })
+
+    service.setAccountFilter("42")
+    compare(viewA.accountFilter, "42")
+    compare(viewB.accountFilter, "42")
+
+    service.setStateFilter("previous")
+    compare(viewA.stateFilter, "previous")
+    compare(viewB.stateFilter, "previous")
+
+    viewA.destroy()
+    viewB.destroy()
+  }
+
+  function test_two_bar_views_share_optimistic_mark_read() {
+    var item = {
+      id: "shared",
+      accountId: "42",
+      url: "",
+      unread: true
+    }
+    service.notifications = [item]
+    service.unreadCount = 1
+
+    var viewA = barViewComponent.createObject(this, { service: service })
+    var viewB = barViewComponent.createObject(this, { service: service })
+    compare(viewA.unreadCount, 1)
+    compare(viewB.unreadCount, 1)
+
+    service.markRead(item)
+    compare(viewA.unreadCount, 0)
+    compare(viewB.unreadCount, 0)
+    compare(service.notifications[0].unread, false)
+
+    viewA.destroy()
+    viewB.destroy()
+  }
+
+  function test_stale_account_filter_clears_when_accounts_change() {
+    service.setAccountFilter("gone")
+    service.accounts = [{ id: "1", name: "One" }]
+    compare(service.accountFilter, "")
+  }
+
+  function test_matching_account_filter_is_kept_when_accounts_change() {
+    service.setAccountFilter("1")
+    service.accounts = [{ id: "1", name: "One" }]
+    compare(service.accountFilter, "1")
+  }
+
+  function test_blank_state_filter_falls_back_to_unread() {
+    service.setStateFilter("previous")
+    service.setStateFilter("")
+    compare(service.stateFilter, "unread")
   }
 }
