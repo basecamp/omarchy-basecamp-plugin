@@ -201,6 +201,7 @@ Panel {
     cursorActive = false
     nowMs = Date.now()
     if (panelFlick) panelFlick.contentY = 0
+    service.checkSetupRunning()
     service.refreshIfStale()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
@@ -219,7 +220,10 @@ Panel {
     interval: 3000
     repeat: true
     running: root.opened && (root.needsSetup || service.probeError)
-    onTriggered: service.refresh()
+    onTriggered: {
+      service.checkSetupRunning()
+      service.refresh()
+    }
   }
 
   Service {
@@ -511,6 +515,7 @@ Panel {
                 fontSize: Style.font.body
                 horizontalPadding: Style.spacing.controlPaddingX
                 verticalPadding: Style.spacing.controlPaddingY
+                enabled: !service.setupRunning && !service.setupChecking
                 onClicked: root.launchSetup()
               }
 

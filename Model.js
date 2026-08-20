@@ -24,6 +24,26 @@ function parseCliVersion(raw) {
 // shell command the panel launches in a floating terminal. The launch
 // command preserves the fix's exit status through the IPC refresh so the
 // terminal presentation can honor Ctrl-C (exit 130) from the fix itself.
+var setupLockFilename = "37signals.basecamp.setup.lock"
+
+function setupLockPath(runtimeDir) {
+  return String(runtimeDir || "/tmp").replace(/\/+$/, "") + "/" + setupLockFilename
+}
+
+function shellQuote(value) {
+  return "'" + String(value || "").replace(/'/g, "'\\''") + "'"
+}
+
+function setupLaunchCommand(fix, ipcTarget) {
+  var target = shellQuote(ipcTarget)
+  var completion = "omarchy-shell -q \"$target\" setupFinished"
+  return "target=" + target + "; lock=\"${XDG_RUNTIME_DIR:-/tmp}/" + setupLockFilename + "\"; "
+    + "( flock -n 9 || { printf '%s\\n' 'Basecamp setup is already running.'; exit 75; }; "
+    + "trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; "
+    + "trap 'rc=$?; trap - EXIT; flock -u 9; " + completion + "; exit $rc' EXIT; "
+    + String(fix || "") + " ) 9>\"$lock\""
+}
+
 function setupPlan(installed, supported, authenticated, ipcTarget) {
   var plan = {
     needed: installed !== true || supported !== true || authenticated !== true,
@@ -43,7 +63,7 @@ function setupPlan(installed, supported, authenticated, ipcTarget) {
     plan.buttonLabel = "Update Omarchy…"
     plan.fix = "omarchy update"
   }
-  plan.launchCommand = plan.fix + "; rc=$?; omarchy-shell -q " + String(ipcTarget || "") + " setupFinished; (exit $rc)"
+  plan.launchCommand = setupLaunchCommand(plan.fix, ipcTarget)
   return plan
 }
 
@@ -294,6 +314,8 @@ function notificationMeta(item, nowMs, showAccount) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    setupLockPath: setupLockPath,
+    setupLaunchCommand: setupLaunchCommand,
     setupPlan: setupPlan,
     parseCliVersion: parseCliVersion,
     parseAccounts: parseAccounts,

@@ -42,6 +42,14 @@ TestCase {
     return null
   }
 
+  function findSetupLockProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length > 0 && process.command[0] === "flock") return process
+    }
+    return null
+  }
+
   function probeOutput(authOutput, version) {
     var cliVersion = version === undefined ? "0.9.1" : version
     return "basecamp-version:basecamp version " + String(cliVersion) + "\n" + String(authOutput || "")
@@ -208,6 +216,29 @@ TestCase {
     service.finishSetup()
     compare(service.setupRunning, false)
     verify(service.tryStartSetup())
+    compare(service.setupRunning, true)
+  }
+
+  function test_setup_lock_check_recovers_stale_running_state() {
+    service.setupRunning = true
+    service.checkSetupRunning()
+
+    var process = findSetupLockProcess()
+    verify(process !== null)
+    compare(process.command, ["flock", "-n", "/tmp/37signals.basecamp.setup.lock", "true"])
+    verify(!service.tryStartSetup())
+
+    process.complete(0, "", "")
+    compare(service.setupRunning, false)
+    verify(service.tryStartSetup())
+  }
+
+  function test_setup_lock_check_detects_a_running_process() {
+    service.checkSetupRunning()
+
+    var process = findSetupLockProcess()
+    verify(process !== null)
+    process.complete(1, "", "")
     compare(service.setupRunning, true)
   }
 
