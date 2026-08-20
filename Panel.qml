@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "ServiceHost.js" as ServiceHost
 
 Panel {
   id: root
@@ -16,8 +17,45 @@ Panel {
   property int selectedIndex: 0
   property bool cursorActive: false
   property double nowMs: Date.now()
-  property string accountFilter: ""
-  property string stateFilter: "unread"
+
+  QtObject {
+    id: dummyService
+    property var settings: ({})
+    property bool refreshing: false
+    property bool installed: true
+    property bool supported: true
+    property bool authenticated: true
+    property bool probed: false
+    property bool probeError: false
+    property var accounts: []
+    property var notifications: []
+    property int unreadCount: 0
+    property int accountCount: 0
+    property string lastError: ""
+    property string actionStatus: ""
+    property string accountFilter: ""
+    property string stateFilter: "unread"
+    function refresh() {}
+    function refreshIfStale() {}
+    function openNotification() {}
+    function markRead() {}
+    function setAccountFilter() {}
+    function setStateFilter() {}
+    function tryStartSetup() { return false }
+    function finishSetup() {}
+    function checkSetupRunning() {}
+  }
+
+  // Omarchy mounts one bar per monitor. Read `_services` here so this
+  // binding re-runs when the host finishes creating the singleton; the
+  // lookup itself lives in ServiceHost.js.
+  readonly property var hostedService: {
+    var _ = bar && bar.shell ? bar.shell._services : null
+    return ServiceHost.hostedService(bar)
+  }
+  readonly property var service: hostedService !== null ? hostedService : dummyService
+  readonly property string accountFilter: service.accountFilter
+  readonly property string stateFilter: service.stateFilter
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -68,14 +106,6 @@ Panel {
     return "Designed & built by 37signals"
   }
 
-  function ensureAccountFilter() {
-    if (accountFilter === "") return
-    for (var i = 0; i < service.accounts.length; i++) {
-      if (String(service.accounts[i].id) === accountFilter) return
-    }
-    setAccountFilter("")
-  }
-
   function resetFilteredView() {
     selectedIndex = 0
     cursorActive = false
@@ -87,12 +117,12 @@ Panel {
   }
 
   function setAccountFilter(value) {
-    accountFilter = String(value || "")
+    service.setAccountFilter(value)
     resetFilteredView()
   }
 
   function setStateFilter(value) {
-    stateFilter = String(value || "unread")
+    service.setStateFilter(value)
     resetFilteredView()
   }
 
@@ -226,10 +256,17 @@ Panel {
     }
   }
 
-  Service {
-    id: service
-    settings: root.settings
-    onAccountsChanged: root.ensureAccountFilter()
+  Binding {
+    target: root.hostedService
+    property: "settings"
+    value: root.settings
+    when: root.hostedService !== null
+  }
+
+  Connections {
+    target: root.hostedService
+    function onAccountFilterChanged() { root.resetFilteredView() }
+    function onStateFilterChanged() { root.resetFilteredView() }
   }
 
   Timer {

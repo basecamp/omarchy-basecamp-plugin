@@ -31,6 +31,9 @@ Item {
   readonly property int maxPerAccount: intSetting("maxPerAccount", 20, 5, 50)
   readonly property int accountCount: accounts.length
 
+  property string accountFilter: ""
+  property string stateFilter: "unread"
+
   property string _probeOutput: ""
   property string _accountsOutput: ""
   property string _accountsError: ""
@@ -61,6 +64,24 @@ Item {
     var text = String(value || fallback || "Basecamp request failed").replace(/\s+/g, " ").trim()
     return text.length > 180 ? text.substring(0, 177) + "…" : text
   }
+
+  function setAccountFilter(value) {
+    accountFilter = String(value || "")
+  }
+
+  function setStateFilter(value) {
+    stateFilter = String(value || "unread")
+  }
+
+  function ensureAccountFilter() {
+    if (accountFilter === "") return
+    for (var i = 0; i < accounts.length; i++) {
+      if (String(accounts[i].id) === accountFilter) return
+    }
+    setAccountFilter("")
+  }
+
+  onAccountsChanged: ensureAccountFilter()
 
   function refreshIfStale() {
     var updatedAt = lastUpdated instanceof Date ? lastUpdated.getTime() : 0
