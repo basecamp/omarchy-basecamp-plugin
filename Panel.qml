@@ -25,6 +25,10 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var filteredNotifications: Model.filterNotifications(service.notifications, accountFilter, stateFilter)
   readonly property var accountFilterOptions: Model.accountFilterOptions(service.accounts)
+  readonly property bool shhhEnabled: setting("shhhEnabled", false) === true
+  readonly property string shhhTooltip: shhhEnabled
+    ? "Shhh… is on. Turn it off to highlight the bar icon for unread notifications."
+    : "Turn on Shhh… to keep unread notifications from changing the bar icon color."
 
   readonly property var accountDropdownOptions: {
     var options = accountFilterOptions
@@ -94,6 +98,20 @@ Panel {
   function setStateFilter(value) {
     stateFilter = String(value || "unread")
     resetFilteredView()
+  }
+
+  function persistSettings(values) {
+    var entry = { id: moduleName }
+    for (var existing in settings) if (existing !== "id") entry[existing] = settings[existing]
+    for (var key in values) entry[key] = values[key]
+
+    settings = entry
+    if (bar && bar.shell && typeof bar.shell.updateEntryInline === "function")
+      bar.shell.updateEntryInline(moduleName, entry)
+  }
+
+  function toggleShhh() {
+    persistSettings({ shhhEnabled: !shhhEnabled })
   }
 
   function emptyMessage() {
@@ -287,6 +305,7 @@ Panel {
         visible: root.filteredNotifications.length,
         stateFilter: root.stateFilter,
         accountFilter: root.accountFilter,
+        shhhEnabled: root.shhhEnabled,
         refreshing: service.refreshing,
         error: service.lastError
       })
@@ -302,7 +321,7 @@ Panel {
         BasecampIcon {
           anchors.centerIn: parent
           iconSize: Style.space(12)
-          color: service.unreadCount > 0 ? root.urgent : root.foreground
+          color: Model.shouldHighlightUnreadIcon(service.unreadCount, root.shhhEnabled) ? root.urgent : root.foreground
         }
       }
     }
@@ -338,6 +357,7 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
         if (text === "r" || text === "R") service.refresh()
+        else if (text === "s" || text === "S") root.toggleShhh()
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
       }
@@ -354,7 +374,7 @@ Panel {
 
           Item {
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, refreshButton.implicitHeight)
+            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroActions.implicitHeight)
 
             BasecampIcon {
               id: heroIcon
@@ -368,7 +388,7 @@ Panel {
               id: heroLabels
               anchors.left: heroIcon.right
               anchors.leftMargin: Style.space(14)
-              anchors.right: refreshButton.left
+              anchors.right: heroActions.left
               anchors.rightMargin: Style.space(12)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(3)
@@ -393,15 +413,50 @@ Panel {
               }
             }
 
-            PanelActionButton {
-              id: refreshButton
+            Row {
+              id: heroActions
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              iconText: service.refreshing ? "󰑓" : "󰑐"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              enabled: !service.refreshing
-              onClicked: service.refresh()
+              spacing: Style.space(6)
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Shhh…"
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              ToggleSwitch {
+                id: shhhSwitch
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.shhhEnabled
+                foreground: root.foreground
+                onToggled: root.toggleShhh()
+
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "Shhh"
+                Accessible.description: root.shhhTooltip
+                Accessible.checked: root.shhhEnabled
+                Accessible.onToggleAction: root.toggleShhh()
+
+                PanelToolTip {
+                  visible: shhhSwitch.containsMouse
+                  text: root.shhhTooltip
+                  fontFamily: root.fontFamily
+                }
+              }
+
+              PanelActionButton {
+                id: refreshButton
+                anchors.verticalCenter: parent.verticalCenter
+                iconText: service.refreshing ? "󰑓" : "󰑐"
+                tooltipText: "Refresh Basecamp notifications"
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                enabled: !service.refreshing
+                onClicked: service.refresh()
+              }
             }
           }
 

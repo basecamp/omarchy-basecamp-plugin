@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "37signals.basecamp",
   "name": "Basecamp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "37signals",
   "license": "MIT",
   "description": "Notifications from every Basecamp account available through the Basecamp CLI.",
@@ -21,7 +21,8 @@
     "defaultSection": "right",
     "defaults": {
       "refreshIntervalSec": 600,
-      "maxPerAccount": 20
+      "maxPerAccount": 20,
+      "shhhEnabled": false
     },
     "schema": [
       {
@@ -41,6 +42,13 @@
         "max": 50,
         "step": 5,
         "defaultValue": 20
+      },
+      {
+        "key": "shhhEnabled",
+        "type": "boolean",
+        "label": "Shhh…",
+        "description": "Keep the bar icon color unchanged when notifications are unread.",
+        "defaultValue": false
       }
     ]
   }
