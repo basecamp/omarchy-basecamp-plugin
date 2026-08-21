@@ -118,20 +118,28 @@ wait_for_demo_shell() {
 
 stop_shell() {
   local attempt count
-  for attempt in $(seq 1 5); do
+  count=$(shell_instances | jq 'length')
+  (( count == 0 )) && return 0
+
+  timeout 5 quickshell kill -p "$omarchy_path/shell" --any-display >/dev/null 2>&1 || {
+    # The instance can disappear between the list and kill calls. Treat that
+    # race as success instead of failing a demo that already stopped the shell.
     count=$(shell_instances | jq 'length')
     (( count == 0 )) && return 0
-    timeout 5 quickshell kill -p "$omarchy_path/shell" --any-display >/dev/null 2>&1 || {
-      echo "Could not stop the existing Omarchy Shell." >&2
-      return 1
-    }
-  done
-
-  count=$(shell_instances | jq 'length')
-  (( count == 0 )) || {
-    echo "The existing Omarchy Shell is still running." >&2
+    echo "Could not stop the existing Omarchy Shell." >&2
     return 1
   }
+
+  # `quickshell list` can briefly retain the stopped instance. Wait for it to
+  # disappear instead of issuing a second kill against stale instance data.
+  for attempt in $(seq 1 50); do
+    count=$(shell_instances | jq 'length')
+    (( count == 0 )) && return 0
+    sleep 0.1
+  done
+
+  echo "The existing Omarchy Shell is still running." >&2
+  return 1
 }
 
 focus_workspace() {
