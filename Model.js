@@ -256,17 +256,22 @@ function notificationBadgeText(item, hovered) {
   return String(Math.max(1, (item && item.unreadCount) || 0))
 }
 
+// Decode entities BEFORE stripping tags, so encoded markup (&lt;img …&gt;)
+// becomes real markup and is then removed — never the reverse, which lets
+// it survive into the UI. `&amp;` decodes last so double-encoded entities
+// (&amp;lt;) re-form as inert text instead of live angle brackets.
 function cleanText(value) {
-  return String(value || "")
+  var text = String(value || "")
     .replace(/\\[nrt]/g, " ")
-    .replace(/<br\s*\/?\s*>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, "\"")
     .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&")
+  return text
+    .replace(/<br\s*\/?\s*>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
 }
