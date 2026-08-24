@@ -170,3 +170,15 @@ test("setupPlan maps each setup state to its fix, worst problem first", () => {
   assert.equal(Model.setupPlan(false, false, false, "t").title, "Basecamp CLI is required")
   assert.equal(Model.setupPlan(true, true, true, "t").needed, false)
 })
+
+test("cleanText removes encoded markup instead of decoding it into live rich text", () => {
+  // sanitize-then-unescape ordering bug: encoded tags must never survive as markup
+  assert.equal(Model.cleanText("&lt;img src='http://evil/x'&gt;"), "")
+  assert.equal(Model.cleanText("Before &lt;b&gt;bold&lt;/b&gt; after"), "Before bold after")
+  // double-encoded entities re-form as inert text, not live angle brackets
+  assert.equal(Model.cleanText("&amp;lt;img src=x&amp;gt;"), "&lt;img src=x&gt;")
+  // benign entities still decode
+  assert.equal(Model.cleanText("Tom &amp; Jerry"), "Tom & Jerry")
+  // literal markup is still stripped
+  assert.equal(Model.cleanText("<b>hi</b> <img src='http://evil/x'>"), "hi")
+})
