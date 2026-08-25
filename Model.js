@@ -224,6 +224,10 @@ function filterNotifications(items, accountId, state) {
   })
 }
 
+function shouldHighlightUnreadIcon(unreadCount, shhhEnabled) {
+  return Number(unreadCount || 0) > 0 && shhhEnabled !== true
+}
+
 function accountFilterOptions(accounts) {
   var options = [{ value: "", label: "All accounts" }]
   var source = Array.isArray(accounts) ? accounts.slice() : []
@@ -327,6 +331,7 @@ if (typeof module !== "undefined") {
     parseNotifications: parseNotifications,
     sortNotifications: sortNotifications,
     filterNotifications: filterNotifications,
+    shouldHighlightUnreadIcon: shouldHighlightUnreadIcon,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
     notificationBadgeText: notificationBadgeText,

@@ -113,6 +113,12 @@ test("filterNotifications combines account and read-state filters without reorde
   assert.deepEqual(Model.filterNotifications(items, "", "all").map(item => item.id), ["new-a", "new-b", "old-a"])
 })
 
+test("Shhh mode suppresses the unread icon highlight", () => {
+  assert.equal(Model.shouldHighlightUnreadIcon(3, false), true)
+  assert.equal(Model.shouldHighlightUnreadIcon(3, true), false)
+  assert.equal(Model.shouldHighlightUnreadIcon(0, false), false)
+})
+
 test("notificationMeta includes account context only when requested", () => {
   const item = {
     timestampMs: 0,
