@@ -154,9 +154,9 @@ test("setupPlan maps each setup state to its fix, worst problem first", () => {
     Model.setupLaunchCommand("basecamp auth login", "37signals.basecamp"))
 
   const install = Model.setupPlan(false, true, true, "37signals.basecamp")
-  assert.equal(install.title, "Basecamp CLI is required")
+  assert.equal(install.title, "")
   assert.equal(install.buttonLabel, "Install Basecamp CLI…")
-  assert.equal(install.command, "omarchy pkg add basecamp-cli")
+  assert.equal(install.command, "")
   assert.equal(install.launchCommand,
     Model.setupLaunchCommand("omarchy-pkg-add basecamp-cli && basecamp auth login", "37signals.basecamp"))
 
@@ -167,7 +167,7 @@ test("setupPlan maps each setup state to its fix, worst problem first", () => {
   assert.equal(update.launchCommand,
     Model.setupLaunchCommand("omarchy update", "37signals.basecamp"))
 
-  assert.equal(Model.setupPlan(false, false, false, "t").title, "Basecamp CLI is required")
+  assert.equal(Model.setupPlan(false, false, false, "t").buttonLabel, "Install Basecamp CLI…")
   assert.equal(Model.setupPlan(true, true, true, "t").needed, false)
 })
 

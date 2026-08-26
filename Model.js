@@ -53,8 +53,8 @@ function setupPlan(installed, supported, authenticated, ipcTarget) {
     fix: "basecamp auth login"
   }
   if (installed !== true) {
-    plan.title = "Basecamp CLI is required"
-    plan.command = "omarchy pkg add basecamp-cli"
+    plan.title = ""
+    plan.command = ""
     plan.buttonLabel = "Install Basecamp CLI…"
     plan.fix = "omarchy-pkg-add basecamp-cli && basecamp auth login"
   } else if (supported !== true) {

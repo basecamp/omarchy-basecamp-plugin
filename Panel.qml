@@ -103,6 +103,7 @@ Panel {
 
   readonly property var setupPlan: Model.setupPlan(service.installed, service.supported, service.authenticated, ipcTarget)
   readonly property bool needsSetup: service.probed && setupPlan.needed
+  readonly property bool missingCli: service.probed && service.installed !== true
 
   // Keep one setup flow active until its command reports completion. This
   // prevents a second browser login regardless of how long authentication
@@ -368,8 +369,8 @@ Panel {
               id: heroLabels
               anchors.left: heroIcon.right
               anchors.leftMargin: Style.space(14)
-              anchors.right: refreshButton.left
-              anchors.rightMargin: Style.space(12)
+              anchors.right: root.missingCli ? parent.right : refreshButton.left
+              anchors.rightMargin: root.missingCli ? 0 : Style.space(12)
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(3)
 
@@ -396,6 +397,7 @@ Panel {
 
             PanelActionButton {
               id: refreshButton
+              visible: !root.missingCli
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               iconText: service.refreshing ? "󰑓" : "󰑐"
@@ -502,6 +504,7 @@ Panel {
               bottomPadding: Style.space(18)
 
               Text {
+                visible: root.setupPlan.title !== ""
                 width: parent.width
                 text: root.setupPlan.title
                 color: root.foreground
@@ -527,6 +530,7 @@ Panel {
               }
 
               Item {
+                visible: root.setupPlan.command !== ""
                 width: parent.width
                 implicitHeight: setupCommandRow.implicitHeight + Style.space(4)
 
