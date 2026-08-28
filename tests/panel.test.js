@@ -21,6 +21,10 @@ test("empty setup details stay out of the content area", () => {
   assert.match(panel, /visible:\s*root\.setupPlan\.command\s*!==\s*""/)
 })
 
+test("initial refresh shows Loading… before the first completed fetch", () => {
+  assert.match(panel, /if \(service\.refreshing && service\.lastUpdated instanceof Date && service\.lastUpdated\.getTime\(\) <= 0\) return "Loading…"/)
+})
+
 test("refresh button animates rotation while refreshing", () => {
   assert.match(panel, /RotationAnimation\s+on\s+rotation\s*\{[\s\S]*?running:\s*service\.refreshing/)
 })

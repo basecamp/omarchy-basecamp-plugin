@@ -127,6 +127,7 @@ Panel {
   }
 
   function emptyMessage() {
+    if (service.refreshing && service.lastUpdated instanceof Date && service.lastUpdated.getTime() <= 0) return "Loading…"
     if (service.notifications.length === 0 || stateFilter === "unread") return "You're all caught up."
     return "No previous notifications."
   }
