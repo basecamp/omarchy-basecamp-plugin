@@ -77,6 +77,34 @@ test("parseNotifications preserves unread state and notification fields", () => 
   assert.equal(result.items[1].unread, false)
 })
 
+test("normalizeAppUrl transforms basecampapi URLs to app.basecamp.com URLs", () => {
+  assert.equal(
+    Model.normalizeAppUrl("https://3.basecampapi.com/4413376/my/boosts"),
+    "https://app.basecamp.com/4413376/my/boosts"
+  )
+  assert.equal(
+    Model.normalizeAppUrl("https://3.basecampapi.com/4413376/questions/answers/entries/7838717022/edit"),
+    "https://app.basecamp.com/4413376/questions/answers/entries/7838717022/edit"
+  )
+  assert.equal(
+    Model.normalizeAppUrl("https://app.basecamp.com/4413376/circles/30393747"),
+    "https://app.basecamp.com/4413376/circles/30393747"
+  )
+  assert.equal(Model.normalizeAppUrl(""), "")
+})
+
+test("parseNotifications normalizes basecampapi app_urls to app.basecamp.com", () => {
+  const result = Model.parseNotifications(payload({
+    unreads: [notification({
+      type: "BoostReport",
+      app_url: "https://3.basecampapi.com/4413376/my/boosts"
+    })]
+  }), account, 20)
+
+  assert.equal(result.ok, true)
+  assert.equal(result.items[0].url, "https://app.basecamp.com/4413376/my/boosts")
+})
+
 test("unnamed Pings use participant names while named Pings keep their title", () => {
   const participants = [{ name: "Alice" }, { name: "Bob" }]
   const unnamed = Model.parseNotifications(payload({ unreads: [
