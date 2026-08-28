@@ -163,6 +163,16 @@ function pingTitle(item) {
   return "Ping with " + joinNames(names)
 }
 
+// Workaround for Basecamp CLI/API: the /my/notifications.json endpoint returns
+// REST API endpoint URLs (e.g. https://3.basecampapi.com/...) in app_url for
+// certain notification types (such as BoostReport and Reminder question answers).
+// Convert them to web application URLs (https://app.basecamp.com/...) so opening
+// them in a browser renders the Basecamp web UI instead of raw JSON / 401 API responses.
+function normalizeAppUrl(rawUrl) {
+  var url = String(rawUrl || "").trim()
+  return url.replace("https://3.basecampapi.com/", "https://app.basecamp.com/")
+}
+
 function normalizeNotification(value, account, unread) {
   var item = value || {}
   var id = String(item.id || "").trim()
@@ -189,7 +199,7 @@ function normalizeNotification(value, account, unread) {
     type: cleanText(item.type || ""),
     timestamp: timestamp,
     timestampMs: parsedTime,
-    url: String(item.app_url || ""),
+    url: normalizeAppUrl(item.app_url),
     unread: unread === true,
     unreadCount: positiveInteger(item.unread_count, 0)
   }
@@ -325,6 +335,7 @@ if (typeof module !== "undefined") {
     parseCliVersion: parseCliVersion,
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,
+    normalizeAppUrl: normalizeAppUrl,
     sortNotifications: sortNotifications,
     filterNotifications: filterNotifications,
     accountFilterOptions: accountFilterOptions,
