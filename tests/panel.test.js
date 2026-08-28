@@ -20,3 +20,13 @@ test("empty setup details stay out of the content area", () => {
   assert.match(panel, /visible:\s*root\.setupPlan\.title\s*!==\s*""/)
   assert.match(panel, /visible:\s*root\.setupPlan\.command\s*!==\s*""/)
 })
+
+test("refresh button animates rotation while refreshing", () => {
+  assert.match(panel, /RotationAnimation\s+on\s+rotation\s*\{[\s\S]*?running:\s*service\.refreshing/)
+})
+
+test("empty state message remains visible during refresh", () => {
+  assert.match(panel, /visible:\s*!root\.needsSetup && root\.filteredNotifications\.length === 0 && service\.lastError === ""/)
+})
+
+
