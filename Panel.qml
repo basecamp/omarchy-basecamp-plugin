@@ -127,6 +127,7 @@ Panel {
   }
 
   function emptyMessage() {
+    if (service.refreshing && service.lastUpdated instanceof Date && service.lastUpdated.getTime() <= 0) return "Loading…"
     if (service.notifications.length === 0 || stateFilter === "unread") return "You're all caught up."
     return "No previous notifications."
   }
@@ -432,16 +433,52 @@ Panel {
               }
             }
 
-            PanelActionButton {
+            BorderSurface {
               id: refreshButton
               visible: !root.missingCli
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              iconText: service.refreshing ? "󰑓" : "󰑐"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
+              implicitWidth: Math.max(Style.space(22), Style.font.icon + Style.spacing.sm * 2)
+              implicitHeight: implicitWidth
+              radius: Style.cornerRadius
               enabled: !service.refreshing
-              onClicked: service.refresh()
+
+              readonly property bool _hot: mouse.containsMouse && enabled
+              color: _hot ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent"
+              Behavior on color { ColorAnimation { duration: 60 } }
+
+              RefreshIcon {
+                id: refreshIcon
+                anchors.centerIn: parent
+                iconSize: Style.font.icon
+                color: root.foreground
+                active: service.refreshing
+                transformOrigin: Item.Center
+
+                RotationAnimation on rotation {
+                  from: 0
+                  to: 360
+                  duration: 800
+                  loops: Animation.Infinite
+                  running: service.refreshing
+                }
+              }
+
+              Connections {
+                target: service
+                function onRefreshingChanged() {
+                  if (!service.refreshing) refreshIcon.rotation = 0
+                }
+              }
+
+              MouseArea {
+                id: mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: refreshButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                enabled: refreshButton.enabled
+                onClicked: service.refresh()
+              }
             }
           }
 
@@ -617,7 +654,7 @@ Panel {
             }
 
             Text {
-              visible: !root.needsSetup && !service.refreshing && root.filteredNotifications.length === 0 && service.lastError === ""
+              visible: !root.needsSetup && root.filteredNotifications.length === 0 && service.lastError === ""
             width: parent.width
             text: root.emptyMessage()
             color: root.dim
