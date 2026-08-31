@@ -234,6 +234,18 @@ function filterNotifications(items, accountId, state) {
   })
 }
 
+function unreadCount(items, accountId) {
+  var source = Array.isArray(items) ? items : []
+  var selectedAccount = String(accountId || "")
+  var count = 0
+  for (var i = 0; i < source.length; i++) {
+    var item = source[i]
+    if (selectedAccount !== "" && String(item.accountId || "") !== selectedAccount) continue
+    if (item.unread === true) count++
+  }
+  return count
+}
+
 function accountFilterOptions(accounts) {
   var options = [{ value: "", label: "All accounts" }]
   var source = Array.isArray(accounts) ? accounts.slice() : []
@@ -338,6 +350,7 @@ if (typeof module !== "undefined") {
     normalizeAppUrl: normalizeAppUrl,
     sortNotifications: sortNotifications,
     filterNotifications: filterNotifications,
+    unreadCount: unreadCount,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,
     notificationBadgeText: notificationBadgeText,

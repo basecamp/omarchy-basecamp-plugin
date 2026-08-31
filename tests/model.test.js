@@ -141,6 +141,20 @@ test("filterNotifications combines account and read-state filters without reorde
   assert.deepEqual(Model.filterNotifications(items, "", "all").map(item => item.id), ["new-a", "new-b", "old-a"])
 })
 
+test("unreadCount counts all accounts or a single account", () => {
+  const items = [
+    { id: "new-a", accountId: "a", unread: true },
+    { id: "new-b", accountId: "b", unread: true },
+    { id: "old-a", accountId: "a", unread: false }
+  ]
+
+  assert.equal(Model.unreadCount(items, ""), 2)
+  assert.equal(Model.unreadCount(items, "a"), 1)
+  assert.equal(Model.unreadCount(items, "b"), 1)
+  assert.equal(Model.unreadCount(items, "missing"), 0)
+  assert.equal(Model.unreadCount(null, "a"), 0)
+})
+
 test("notificationMeta includes account context only when requested", () => {
   const item = {
     timestampMs: 0,

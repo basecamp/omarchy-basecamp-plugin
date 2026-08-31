@@ -160,12 +160,7 @@ Panel {
   function accountUnreadCount(accountId) {
     var id = String(accountId || "")
     if (id === "") return 0
-    var count = 0
-    for (var i = 0; i < service.notifications.length; i++) {
-      var item = service.notifications[i]
-      if (item.unread === true && String(item.accountId || "") === id) count++
-    }
-    return count
+    return Model.unreadCount(service.notifications, id)
   }
 
   function cycleAccountFilter(delta) {
