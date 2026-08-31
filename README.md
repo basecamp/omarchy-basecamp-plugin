@@ -13,7 +13,7 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
 - Dismisses an unread notification from its count badge without opening it.
-- Changes the bar logo color when unread notifications exist.
+- Changes the bar logo color when the currently selected account has unread notifications.
 - Shares unread state, account filter, and unread/previous tab across every monitor. Each bar still opens and closes on its own.
 - Polls every 10 minutes from one shared service. Right-click or middle-click the bar logo to refresh immediately.
 

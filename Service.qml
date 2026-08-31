@@ -22,7 +22,7 @@ Item {
   property string cliVersion: ""
   property var accounts: []
   property var notifications: []
-  property int unreadCount: 0
+  readonly property int unreadCount: Model.unreadCount(notifications, accountFilter)
   property date lastUpdated: new Date(0)
   property string lastError: ""
   property string actionStatus: ""
@@ -205,9 +205,6 @@ Item {
 
   function finishRefresh() {
     notifications = Model.sortNotifications(_fetchedNotifications)
-    var unread = 0
-    for (var i = 0; i < notifications.length; i++) if (notifications[i].unread) unread += 1
-    unreadCount = unread
     refreshing = false
     lastUpdated = new Date()
     lastError = _partialErrors.length > 0 ? _partialErrors.join(" · ") : ""
@@ -242,7 +239,6 @@ Item {
       }
     }
     notifications = changed
-    unreadCount = Math.max(0, unreadCount - 1)
   }
 
   function runNextRead() {

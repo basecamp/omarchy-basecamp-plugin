@@ -94,7 +94,6 @@ TestCase {
       unread: true
     }
     service.notifications = [item]
-    service.unreadCount = 1
     service.markRead(item)
 
     compare(service.actionStatus, "Marking notification as read…")
@@ -324,6 +323,19 @@ TestCase {
     viewB.destroy()
   }
 
+  function test_unread_count_follows_account_filter() {
+    service.notifications = [
+      { id: "a", accountId: "1", unread: true },
+      { id: "b", accountId: "2", unread: true }
+    ]
+
+    compare(service.unreadCount, 2)
+    service.setAccountFilter("1")
+    compare(service.unreadCount, 1)
+    service.setAccountFilter("missing")
+    compare(service.unreadCount, 0)
+  }
+
   function test_two_bar_views_share_optimistic_mark_read() {
     var item = {
       id: "shared",
@@ -332,7 +344,6 @@ TestCase {
       unread: true
     }
     service.notifications = [item]
-    service.unreadCount = 1
 
     var viewA = barViewComponent.createObject(this, { service: service })
     var viewB = barViewComponent.createObject(this, { service: service })
