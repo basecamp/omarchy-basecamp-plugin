@@ -47,6 +47,9 @@ Item {
   property var _readingNotification: null
   property string _readOutput: ""
   property string _readError: ""
+  property var _bubblingUp: null
+  property string _bubbleUpOutput: ""
+  property string _bubbleUpError: ""
   property var _partialErrors: []
 
   function setting(name, fallback) {
@@ -276,6 +279,36 @@ Item {
     else refreshAfterRead.restart()
   }
 
+  function bubbleUp(item) {
+    if (!item || !Model.canBubbleUp(item)) return
+    if (bubbleUpProcess.running) return
+    _bubblingUp = item
+    actionStatusTimer.stop()
+    actionStatus = "Bubbling up…"
+    _bubbleUpOutput = ""
+    _bubbleUpError = ""
+    bubbleUpProcess.command = [
+      "basecamp", "api", "post",
+      String(item.bubbleUpUrl),
+      "--data", "{}",
+      "--account", String(item.accountId),
+      "--json"
+    ]
+    bubbleUpProcess.running = true
+  }
+
+  function finishBubbleUp(exitCode, stdout, stderr) {
+    if (exitCode !== 0) {
+      lastError = conciseError(stderr || stdout, "Could not bubble up the notification")
+      actionStatus = lastError
+    } else {
+      actionStatus = "Bubbled up"
+    }
+    actionStatusTimer.restart()
+    _bubblingUp = null
+    refreshAfterBubbleUp.restart()
+  }
+
   Timer {
     id: refreshTimer
     interval: root.refreshIntervalSec * 1000
@@ -287,6 +320,13 @@ Item {
 
   Timer {
     id: refreshAfterRead
+    interval: 1200
+    repeat: false
+    onTriggered: root.refresh()
+  }
+
+  Timer {
+    id: refreshAfterBubbleUp
     interval: 1200
     repeat: false
     onTriggered: root.refresh()
@@ -419,6 +459,27 @@ Item {
       var stdout = String(readStdout.text || root._readOutput || "")
       var stderr = String(readStderr.text || root._readError || "")
       root.finishRead(exitCode, stdout, stderr)
+    }
+  }
+
+  Process {
+    id: bubbleUpProcess
+    running: false
+    command: []
+    stdout: StdioCollector {
+      id: bubbleUpStdout
+      waitForEnd: true
+      onStreamFinished: root._bubbleUpOutput = text
+    }
+    stderr: StdioCollector {
+      id: bubbleUpStderr
+      waitForEnd: true
+      onStreamFinished: root._bubbleUpError = text
+    }
+    onExited: function(exitCode) {
+      var stdout = String(bubbleUpStdout.text || root._bubbleUpOutput || "")
+      var stderr = String(bubbleUpStderr.text || root._bubbleUpError || "")
+      root.finishBubbleUp(exitCode, stdout, stderr)
     }
   }
 }

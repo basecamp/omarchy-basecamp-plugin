@@ -73,7 +73,7 @@ def notification_by_id(fixture, account_id, notification_id):
 def rendered_notification(source, read, now):
     notification = deepcopy(source)
     minutes_ago = int(notification.pop("minutes_ago"))
-    notification.pop("account_id", None)
+    account_id = str(notification.pop("account_id", ""))
     notification.pop("state", None)
 
     timestamp = now - timedelta(minutes=minutes_ago)
@@ -81,6 +81,9 @@ def rendered_notification(source, read, now):
     notification["created_at"] = formatted
     notification["updated_at"] = formatted
     notification["app_url"] = ""
+    notification["bubble_up_url"] = (
+        f"https://3.basecampapi.com/{account_id}/my/readings/{source['id']}/bubble_up.json"
+    )
     if read:
         notification["read_at"] = formatted
     else:
@@ -144,6 +147,24 @@ def mark_notification_read(fixture, args):
     print(json.dumps({"ok": True, "data": {"id": notification_id}}))
 
 
+def bubble_up_notification(fixture, args):
+    url = args[2]
+    account_id = option(args, "--account")
+    # "https://3.basecampapi.com/<account>/my/readings/<id>/bubble_up.json"
+    parts = url.rstrip("/").split("/")
+    notification_id = parts[-2] if len(parts) >= 2 else ""
+    if not notification_id or notification_id == "readings":
+        fail(f"Malformed bubble up URL: {url}")
+    notification_by_id(fixture, account_id, notification_id)
+
+    state = load_state()
+    bubbled = {str(value) for value in state.get("bubble_up_ids", [])}
+    bubbled.add(f"{account_id}:{notification_id}")
+    state["bubble_up_ids"] = sorted(bubbled)
+    save_state(state)
+    print(json.dumps({"ok": True, "data": {"id": notification_id, "bubbled_up": True}}))
+
+
 def main():
     fixture = load_fixture()
     args = sys.argv[1:]
@@ -160,6 +181,11 @@ def main():
     elif (len(args) == 6 and args[:2] == ["notifications", "read"]
           and args[3] == "--account" and args[5] == "--json"):
         mark_notification_read(fixture, args)
+    elif (len(args) == 8 and args[:2] == ["api", "post"]
+          and args[2].startswith("https://3.basecampapi.com/")
+          and args[3] == "--data" and args[4] == "{}"
+          and args[5] == "--account" and args[7] == "--json"):
+        bubble_up_notification(fixture, args)
     else:
         fail("Unsupported demo Basecamp CLI command: " + " ".join(args))
 

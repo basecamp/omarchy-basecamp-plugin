@@ -104,6 +104,28 @@ TestCase {
     return process
   }
 
+  function findBubbleUpProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length >= 3
+          && process.command[0] === "basecamp"
+          && process.command[1] === "api"
+          && process.command[2] === "post") return process
+    }
+    return null
+  }
+
+  function bubbleableItem(id) {
+    return {
+      id: String(id),
+      accountId: "42",
+      url: "",
+      bubbleUpUrl: "https://3.basecampapi.com/42/my/readings/" + String(id) + "/bubble_up.json",
+      section: "inbox",
+      unread: false
+    }
+  }
+
   function test_confirmation_starts_after_the_read_finishes() {
     var process = beginRead("success")
 
@@ -364,5 +386,52 @@ TestCase {
     service.setStateFilter("previous")
     service.setStateFilter("")
     compare(service.stateFilter, "unread")
+  }
+
+  function test_bubble_up_posts_to_the_bubble_up_url() {
+    var item = bubbleableItem("77")
+    service.notifications = [item]
+    service.bubbleUp(item)
+
+    compare(service.actionStatus, "Bubbling up…")
+    var process = findBubbleUpProcess()
+    verify(process !== null)
+    verify(process.running)
+    compare(process.command, [
+      "basecamp", "api", "post", item.bubbleUpUrl,
+      "--data", "{}", "--account", "42", "--json"
+    ])
+  }
+
+  function test_bubble_up_confirms_and_refreshes_after_success() {
+    var item = bubbleableItem("78")
+    service.notifications = [item]
+    service.bubbleUp(item)
+
+    var process = findBubbleUpProcess()
+    process.complete(0, "{}", "")
+    compare(service.actionStatus, "Bubbled up")
+    tryCompare(service, "actionStatus", "", 3000)
+  }
+
+  function test_bubble_up_reports_cli_errors() {
+    var item = bubbleableItem("79")
+    service.notifications = [item]
+    service.bubbleUp(item)
+
+    var process = findBubbleUpProcess()
+    process.complete(1, "", "Permission denied")
+    compare(service.lastError, "Permission denied")
+    compare(service.actionStatus, "Permission denied")
+    tryCompare(service, "actionStatus", "", 3000)
+  }
+
+  function test_bubble_up_ignores_items_without_a_bubble_up_url() {
+    var item = { id: "80", accountId: "42", url: "" }
+    service.notifications = [item]
+    service.bubbleUp(item)
+
+    compare(service.actionStatus, "")
+    compare(findBubbleUpProcess(), null)
   }
 }

@@ -62,6 +62,33 @@ test("parseAccounts normalizes valid accounts and skips missing ids", () => {
   ])
 })
 
+test("parseNotifications captures bubble_up_url and section for bubble-up eligibility", () => {
+  const result = Model.parseNotifications(payload({
+    unreads: [notification({
+      section: "inbox",
+      bubble_up_url: "https://3.basecampapi.com/42/my/readings/10/bubble_up.json"
+    })],
+    bubble_ups: [notification({
+      id: 12,
+      section: "bubbles",
+      bubble_up_url: "https://3.basecampapi.com/42/my/readings/12/bubble_up.json"
+    })]
+  }), account, 20)
+
+  assert.equal(result.ok, true)
+  assert.equal(result.items[0].bubbleUpUrl, "https://3.basecampapi.com/42/my/readings/10/bubble_up.json")
+  assert.equal(result.items[0].section, "inbox")
+  assert.ok(Model.canBubbleUp(result.items[0]))
+})
+
+test("canBubbleUp is false for items without a bubble_up_url or already bubbled", () => {
+  assert.equal(Model.canBubbleUp(null), false)
+  assert.equal(Model.canBubbleUp({}), false)
+  assert.equal(Model.canBubbleUp({ bubbleUpUrl: "" }), false)
+  assert.equal(Model.canBubbleUp({ bubbleUpUrl: "url", section: "bubbles" }), false)
+  assert.equal(Model.canBubbleUp({ bubbleUpUrl: "url", section: "inbox" }), true)
+})
+
 test("parseNotifications preserves unread state and notification fields", () => {
   const result = Model.parseNotifications(payload({
     unreads: [notification({ creator: { name: "Alice" }, unread_count: 3 })],

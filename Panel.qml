@@ -39,6 +39,7 @@ Panel {
     function refreshIfStale() {}
     function openNotification() {}
     function markRead() {}
+    function bubbleUp() {}
     function setAccountFilter() {}
     function setStateFilter() {}
     function tryStartSetup() { return false }
@@ -207,6 +208,11 @@ Panel {
   function activateSelection() {
     if (!cursorActive || filteredNotifications.length === 0) return
     service.openNotification(filteredNotifications[selectedIndex])
+  }
+
+  function bubbleUpSelection() {
+    if (!cursorActive || filteredNotifications.length === 0) return
+    service.bubbleUp(filteredNotifications[selectedIndex])
   }
 
   function scrollSelectionIntoView() {
@@ -379,6 +385,7 @@ Panel {
         if (text === "r" || text === "R") service.refresh()
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
+        else if (text === "b" || text === "B") root.bubbleUpSelection()
       }
 
       ColumnLayout {
@@ -688,15 +695,24 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
+                  acceptedButtons: Qt.LeftButton | Qt.RightButton
                   onPositionChanged: function(mouse) {
                     if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
                   }
-                  onClicked: service.openNotification(notificationRow.modelData)
+                  onClicked: function(mouse) {
+                    if (mouse.button === Qt.RightButton && Model.canBubbleUp(notificationRow.modelData)) {
+                      service.bubbleUp(notificationRow.modelData)
+                    } else {
+                      service.openNotification(notificationRow.modelData)
+                    }
+                  }
                 }
 
                 PanelToolTip {
                   visible: rowMouse.containsMouse
-                  text: (notificationRow.modelData.type || "Notification") + (notificationRow.modelData.unread ? " · Unread" : " · Read")
+                  text: (notificationRow.modelData.type || "Notification")
+                    + (notificationRow.modelData.unread ? " · Unread" : " · Read")
+                    + (Model.canBubbleUp(notificationRow.modelData) ? " · Right-click to bubble up" : "")
                   fontFamily: root.fontFamily
                 }
 

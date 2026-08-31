@@ -13,6 +13,7 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
 - Dismisses an unread notification from its count badge without opening it.
+- Bubbles up (resurfaces) a notification so it comes back to your attention on Basecamp 5 accounts.
 - Changes the bar logo color when unread notifications exist.
 - Shares unread state, account filter, and unread/previous tab across every monitor. Each bar still opens and closes on its own.
 - Polls every 10 minutes from one shared service. Right-click or middle-click the bar logo to refresh immediately.
@@ -65,9 +66,10 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Select `Unread` or `Previous notifications` below the Basecamp title.
 - Click a notification to open it. Unread notifications are also marked as read.
 - Hover the unread count on a notification to reveal a dismiss control. Click it to mark the item as read without opening it.
+- Right-click a notification to bubble it up so it resurfaces later. Only items Basecamp reports as bubbleable offer this action.
 - Use the up and down arrow keys to move through notifications.
 - Use the left and right arrow keys to move through account filters.
-- Press `U` for unread notifications, `P` for previous notifications, or `R` to refresh.
+- Press `U` for unread notifications, `P` for previous notifications, `B` to bubble up the selected notification, or `R` to refresh.
 
 ## Development
 
@@ -129,6 +131,7 @@ basecamp auth status --json
 basecamp accounts list --json
 basecamp notifications list --account <account-id> --json
 basecamp notifications read <notification-id> --account <account-id> --json
+basecamp api post <bubble-up-url> --data '{}' --account <account-id> --json
 ```
 
 Notification data is held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.

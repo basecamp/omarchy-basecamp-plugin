@@ -33,4 +33,8 @@ test("empty state message remains visible during refresh", () => {
   assert.match(panel, /visible:\s*!root\.needsSetup && root\.filteredNotifications\.length === 0 && service\.lastError === ""/)
 })
 
+test("right-click bubbles up an eligible notification", () => {
+  assert.match(panel, /Qt\.RightButton && Model\.canBubbleUp\(notificationRow\.modelData\)/)
+  assert.match(panel, /service\.bubbleUp\(notificationRow\.modelData\)/)
+})
 

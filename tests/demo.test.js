@@ -138,6 +138,24 @@ test("demo read state is scoped by account and notification id", () => {
   })
 })
 
+test("demo notifications expose a bubble_up_url and accept the bubble up action", () => {
+  withState(stateDir => {
+    const result = successfulJson([
+      "notifications", "list", "--account", "1001", "--json"
+    ], stateDir)
+    assert.ok(result.data.unreads.some(item =>
+      String(item.bubble_up_url || "").indexOf("/my/readings/") !== -1))
+
+    const item = result.data.unreads[0]
+    const bubbled = successfulJson([
+      "api", "post", item.bubble_up_url, "--data", "{}",
+      "--account", "1001", "--json"
+    ], stateDir)
+    assert.equal(bubbled.ok, true)
+    assert.equal(bubbled.data.bubbled_up, true)
+  })
+})
+
 test("demo CLI rejects commands outside the plugin contract", () => {
   withState(stateDir => {
     for (const args of [

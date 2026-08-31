@@ -196,13 +196,24 @@ function normalizeNotification(value, account, unread) {
     creator: cleanText(item.creator && item.creator.name ? item.creator.name : ""),
     excerpt: cleanText(item.content_excerpt || ""),
     project: cleanText(item.bucket_name || item.section || ""),
+    section: cleanText(item.section || ""),
     type: cleanText(item.type || ""),
     timestamp: timestamp,
     timestampMs: parsedTime,
     url: normalizeAppUrl(item.app_url),
+    bubbleUpUrl: String(item.bubble_up_url || "").trim(),
     unread: unread === true,
     unreadCount: positiveInteger(item.unread_count, 0)
   }
+}
+
+// An item can be bubbled up when Basecamp 5 exposes a bubble_up_url for it
+// and it is not already sitting in the bubbles section (where the same URL
+// would pop it rather than resurface it).
+function canBubbleUp(item) {
+  if (!item) return false
+  if (String(item.bubbleUpUrl || "").trim() === "") return false
+  return String(item.section || "").toLowerCase() !== "bubbles"
 }
 
 function compareWithinAccount(a, b) {
@@ -336,6 +347,7 @@ if (typeof module !== "undefined") {
     parseAccounts: parseAccounts,
     parseNotifications: parseNotifications,
     normalizeAppUrl: normalizeAppUrl,
+    canBubbleUp: canBubbleUp,
     sortNotifications: sortNotifications,
     filterNotifications: filterNotifications,
     accountFilterOptions: accountFilterOptions,
