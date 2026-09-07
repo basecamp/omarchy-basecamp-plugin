@@ -1,0 +1,333 @@
+// Adapted from Omarchy's Dropdown.qml under the MIT terms in
+// THIRD_PARTY_NOTICES.md.
+import QtQuick
+import QtQuick.Controls
+import Quickshell
+import qs.Commons
+import qs.Ui
+
+// Themed single-select dropdown with plain-text labels and Omarchy panel
+// colors. `options` accepts strings or { value, label, badge } objects; a
+// non-empty badge renders as a trailing count bubble in the trigger and list.
+//
+// Keyboard: Tab focuses the trigger, Enter/Space opens, Esc closes, j/k or
+// Up/Down selects an option, and Enter confirms it.
+Item {
+  id: root
+
+  property string label: ""
+  property string value: ""
+  property var options: []
+
+  property color foreground: Color.popups.text
+  property color background: Color.popups.background
+  property color popupBorder: Color.popups.border
+  property color accent: Color.accent
+  property color badgeColor: accent
+  property color badgeForeground: background
+  readonly property var popupBorderSpec: Border.localOrSurfaceSpec("popups", "border", popupBorder, Color.popups.border, Style.normalBorderWidth)
+  property string fontFamily: Style.font.family
+  property int rowHeight: Style.spacing.controlHeight
+  property int popupRowHeight: Style.spacing.popupRowHeight
+  property bool showLabel: true
+
+  // Panel-cursor flag. When true, the trigger renders the shared
+  // hover-cursor state. Active Qt focus defaults to the same visuals.
+  // Emits `hovered(bool)` on pointer enter/leave so the panel can keep
+  // its cursor state in sync with the mouse.
+  property bool hasCursor: false
+
+  // A vertical bar pins the panel card near the bottom of the screen, where
+  // a popup that only opens downward runs past the monitor edge and gets
+  // clipped. Compute the trigger's bottom edge inside its window (the panel
+  // is a full-bleed layer-shell, so window coordinates are screen
+  // coordinates) and flip the popup above the trigger when there isn't room
+  // below. Popup x/y are trigger-relative, so a negative y lands just above
+  // the trigger.
+  property bool openUpward: false
+
+  // Geometry overrides let the component exercise its real popup placement in
+  // a controlled QML test window. Normal panel instances use QsWindow below.
+  property var _placementWindow: null
+  property Item _placementContentItem: null
+  readonly property real _popupY: popup.y
+  readonly property real _popupHeight: popup.implicitHeight
+
+  function computePlacement() {
+    var hostWindow = _placementWindow
+    var windowContent = _placementContentItem
+    if (!hostWindow || !windowContent) {
+      hostWindow = trigger ? trigger.QsWindow.window : null
+      windowContent = trigger ? trigger.QsWindow.contentItem : null
+    }
+    if (!hostWindow || !windowContent) return
+    var gap = Style.spacing.xxs
+    var bottom = trigger.mapToItem(windowContent, 0, trigger.height + gap).y
+    openUpward = (bottom + popup.implicitHeight) > (hostWindow.height - gap)
+  }
+
+  // popupOpen + open()/close()/toggle() let a parent panel know when the
+  // dropdown owns keys (its embedded ListView is active) and suspend its
+  // own keyCatcher so j/k inside the popup don't double-drive the panel
+  // cursor.
+  readonly property bool popupOpen: popup.opened
+  function open() { computePlacement(); popup.open() }
+  function close() { popup.close() }
+  function toggle() { computePlacement(); popup.opened ? popup.close() : popup.open() }
+
+  signal changed(string value)
+  signal hovered(bool isHovered)
+
+  function optionValue(o) {
+    return (o && typeof o === "object") ? String(o.value) : String(o)
+  }
+  function optionLabel(o) {
+    return (o && typeof o === "object") ? String(o.label) : String(o)
+  }
+  function optionBadge(o) {
+    if (!o || typeof o !== "object" || o.badge === undefined || o.badge === null) return ""
+    return String(o.badge)
+  }
+  function currentOption() {
+    for (var i = 0; i < options.length; i++) {
+      if (optionValue(options[i]) === value) return options[i]
+    }
+    return null
+  }
+  function currentLabel() {
+    var option = currentOption()
+    return option === null ? value : optionLabel(option)
+  }
+  function currentOptionBadge() {
+    var option = currentOption()
+    return option === null ? "" : optionBadge(option)
+  }
+
+  implicitWidth: Style.spacing.dropdownWidth
+  implicitHeight: showLabel && label !== "" ? rowHeight + Style.spacing.huge : rowHeight
+
+  Column {
+    anchors.fill: parent
+    spacing: Style.spacing.labelGap
+
+    Text {
+      visible: root.showLabel && root.label !== ""
+      text: root.label
+      textFormat: Text.PlainText
+      color: Qt.darker(root.foreground, 1.4)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+
+    BorderSurface {
+      id: trigger
+      width: parent.width
+      height: root.rowHeight
+      radius: Style.cornerRadius
+
+      readonly property bool _focused: trigger.activeFocus
+      readonly property bool _hot: triggerHover.hovered || root.hasCursor
+      readonly property var _borderSpec: Border.controlSpec(trigger._focused ? "focus" : (trigger._hot ? "hover-cursor" : "normal"), root.foreground, root.accent)
+
+      color: Style.controlFill(trigger._focused, trigger._hot, root.foreground, root.accent)
+      borderSpec: _borderSpec
+
+      activeFocusOnTab: true
+
+      HoverHandler {
+        id: triggerHover
+        onHoveredChanged: root.hovered(hovered)
+      }
+
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+            || event.key === Qt.Key_Space || event.key === Qt.Key_Down) {
+          popup.opened ? popup.close() : root.open()
+          event.accepted = true
+        } else if (event.key === Qt.Key_Escape && popup.opened) {
+          popup.close(); event.accepted = true
+        }
+      }
+
+      Text {
+        anchors.left: parent.left
+        anchors.right: currentBadgeBubble.visible ? currentBadgeBubble.left : chevron.left
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: trigger.borderLeft + Style.spacing.controlPaddingX
+        anchors.rightMargin: Style.spacing.controlGap
+        text: root.currentLabel()
+        textFormat: Text.PlainText
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+
+      Rectangle {
+        id: currentBadgeBubble
+        visible: root.currentOptionBadge() !== ""
+        anchors.right: chevron.left
+        anchors.rightMargin: Style.spacing.controlGap
+        anchors.verticalCenter: parent.verticalCenter
+        height: Style.spacing.huge
+        width: Math.max(height, currentBadgeLabel.implicitWidth + Style.spacing.controlGap)
+        radius: height / 2
+        color: root.badgeColor
+
+        Text {
+          id: currentBadgeLabel
+          anchors.centerIn: parent
+          text: root.currentOptionBadge()
+          textFormat: Text.PlainText
+          color: root.badgeForeground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+      }
+
+      Text {
+        id: chevron
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.rightMargin: trigger.borderRight + Style.spacing.controlGap
+        text: "󰅀"
+        textFormat: Text.PlainText
+        color: Qt.darker(root.foreground, 1.2)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+          trigger.forceActiveFocus()
+          popup.opened ? popup.close() : root.open()
+        }
+      }
+
+      Popup {
+        id: popup
+        x: 0
+        y: root.openUpward ? -(popup.implicitHeight + Style.spacing.xxs) : trigger.height + Style.spacing.xxs
+        width: trigger.width
+        implicitHeight: Math.min(root.options.length * root.popupRowHeight + Math.max(0, root.options.length - 1) * Style.spacing.labelGap + Style.spacing.xxs,
+                                 root.popupRowHeight * 8 + 7 * Style.spacing.labelGap + Style.spacing.xxs)
+        padding: Style.spacing.hairline
+        leftPadding: Border.left(root.popupBorderSpec) + Style.spacing.hairline
+        rightPadding: Border.right(root.popupBorderSpec) + Style.spacing.hairline
+        topPadding: Border.top(root.popupBorderSpec) + Style.spacing.hairline
+        bottomPadding: Border.bottom(root.popupBorderSpec) + Style.spacing.hairline
+        focus: true
+
+        background: BorderSurface {
+          color: root.background
+          borderSpec: root.popupBorderSpec
+          radius: Style.cornerRadius
+        }
+
+        onOpenedChanged: {
+          if (!opened) return
+          root.computePlacement()
+          optionList.currentIndex = Math.max(0, optionList.indexOfValue(root.value))
+          optionList.forceActiveFocus()
+        }
+
+        contentItem: ListView {
+          id: optionList
+          spacing: Style.spacing.labelGap
+
+          Keys.priority: Keys.BeforeItem
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape) { popup.close(); event.accepted = true }
+            else if (event.key === Qt.Key_Down || event.text === "j") {
+              optionList.currentIndex = Math.min(root.options.length - 1, optionList.currentIndex + 1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Up || event.text === "k") {
+              optionList.currentIndex = Math.max(0, optionList.currentIndex - 1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              optionList.selectCurrent(); event.accepted = true
+            }
+          }
+          implicitHeight: contentHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          model: root.options
+          currentIndex: -1
+
+          function indexOfValue(v) {
+            for (var i = 0; i < root.options.length; i++)
+              if (root.optionValue(root.options[i]) === v) return i
+            return -1
+          }
+
+          function selectCurrent() {
+            if (currentIndex < 0 || currentIndex >= root.options.length) return
+            var v = root.optionValue(root.options[currentIndex])
+            root.value = v
+            root.changed(v)
+            popup.close()
+          }
+
+          delegate: Rectangle {
+            required property var modelData
+            required property int index
+            width: optionList.width
+            height: root.popupRowHeight
+            color: index === optionList.currentIndex
+              ? Style.hoverFillFor(root.foreground, root.accent)
+              : "transparent"
+
+            Text {
+              anchors.left: parent.left
+              anchors.right: optionBadge.visible ? optionBadge.left : parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: Style.spacing.controlPaddingX
+              anchors.rightMargin: Style.spacing.controlGap
+              text: root.optionLabel(modelData)
+              textFormat: Text.PlainText
+              color: index === optionList.currentIndex ? Style.hoverStateColor(root.foreground, root.accent) : root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              elide: Text.ElideRight
+            }
+
+            Rectangle {
+              id: optionBadge
+              visible: root.optionBadge(modelData) !== ""
+              anchors.right: parent.right
+              anchors.rightMargin: Style.spacing.controlPaddingX
+              anchors.verticalCenter: parent.verticalCenter
+              height: Style.spacing.huge
+              width: Math.max(height, optionBadgeText.implicitWidth + Style.spacing.controlGap)
+              radius: height / 2
+              color: root.badgeColor
+
+              Text {
+                id: optionBadgeText
+                anchors.centerIn: parent
+                text: root.optionBadge(modelData)
+                textFormat: Text.PlainText
+                color: root.badgeForeground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onPositionChanged: optionList.currentIndex = parent.index
+              onClicked: optionList.selectCurrent()
+            }
+          }
+        }
+      }
+    }
+  }
+}

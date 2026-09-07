@@ -5,6 +5,12 @@ const path = require("node:path")
 
 const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
+test("account options expose unread counts as styled badges", () => {
+  assert.match(panel, /label:\s*options\[i\]\.label,\s*badge:\s*count > 0 \? String\(count\) : ""/)
+  assert.match(panel, /function accountUnreadCount\(accountId\)\s*{\s*return Model\.unreadCount\(service\.notifications, String\(accountId \|\| ""\)\)/)
+  assert.match(panel, /PlainTextDropdown\s*{\s*id:\s*accountDropdown[\s\S]*?badgeColor:\s*root\.urgent/)
+})
+
 test("setup panel keeps the Basecamp branding header visible", () => {
   assert.match(panel, /Column\s*{\s*id:\s*fixedContent\s*Layout\.fillWidth/)
   const header = panel.slice(panel.indexOf("id: fixedContent"), panel.indexOf("PanelSeparator", panel.indexOf("id: fixedContent")))

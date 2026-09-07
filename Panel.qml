@@ -71,7 +71,8 @@ Panel {
       var count = accountUnreadCount(options[i].value)
       out.push({
         value: options[i].value,
-        label: count > 0 ? options[i].label + " (" + count + ")" : options[i].label
+        label: options[i].label,
+        badge: count > 0 ? String(count) : ""
       })
     }
     return out
@@ -158,9 +159,7 @@ Panel {
   }
 
   function accountUnreadCount(accountId) {
-    var id = String(accountId || "")
-    if (id === "") return 0
-    return Model.unreadCount(service.notifications, id)
+    return Model.unreadCount(service.notifications, String(accountId || ""))
   }
 
   function cycleAccountFilter(delta) {
@@ -481,7 +480,7 @@ Panel {
             foreground: root.foreground
           }
 
-          Dropdown {
+          PlainTextDropdown {
             id: accountDropdown
             visible: service.accountCount > 1 && !root.needsSetup
             width: parent.width
@@ -490,6 +489,7 @@ Panel {
             foreground: root.foreground
             background: Color.popups.background
             accent: Color.accent
+            badgeColor: root.urgent
             fontFamily: root.fontFamily
             onChanged: function(value) { root.setAccountFilter(value) }
 
@@ -500,7 +500,7 @@ Panel {
             onPopupOpenChanged: if (!popupOpen) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
 
             // Binding element (not an inline binding) so it survives the
-            // imperative `value` write Dropdown makes on selection.
+            // imperative `value` write PlainTextDropdown makes on selection.
             Binding on value {
               value: root.accountFilter
             }
