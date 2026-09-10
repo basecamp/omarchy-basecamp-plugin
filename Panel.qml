@@ -343,8 +343,10 @@ Panel {
       ? "Refreshing Basecamp notifications"
       : (service.unreadCount === 1 ? "1 unread Basecamp notification" : service.unreadCount + " unread Basecamp notifications")
     onPressed: function(buttonCode) {
-      if (buttonCode === Qt.RightButton || buttonCode === Qt.MiddleButton) service.refresh()
-      else root.toggle()
+      if (buttonCode === Qt.LeftButton) root.toggle()
+    }
+    HoverHandler {
+      onHoveredChanged: if (hovered) service.refresh()
     }
   }
 
