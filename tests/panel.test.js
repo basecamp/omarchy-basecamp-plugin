@@ -35,8 +35,15 @@ test("refresh button animates rotation while refreshing", () => {
   assert.match(panel, /RotationAnimation\s+on\s+rotation\s*\{[\s\S]*?running:\s*service\.refreshing/)
 })
 
+test("hovering the bar icon refreshes while left click only toggles", () => {
+  const start = panel.indexOf("BarIconButton {")
+  const end = panel.indexOf("\n  KeyboardPanel", start)
+  const button = panel.slice(start, end)
+
+  assert.match(button, /HoverHandler\s*\{\s*onHoveredChanged: if \(hovered\) service\.refresh\(\)\s*\}/)
+  assert.match(button, /onPressed: function\(buttonCode\)\s*\{\s*if \(buttonCode === Qt\.LeftButton\) root\.toggle\(\)\s*\}/)
+})
+
 test("empty state message remains visible during refresh", () => {
   assert.match(panel, /visible:\s*!root\.needsSetup && root\.filteredNotifications\.length === 0 && service\.lastError === ""/)
 })
-
-
