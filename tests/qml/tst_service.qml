@@ -177,6 +177,40 @@ TestCase {
     compare(service.lastError, "")
   }
 
+  function test_structured_command_errors_show_message_not_json_data() {
+    return [
+      { tag: "accounts stdout", command: "accounts", stderr: false },
+      { tag: "accounts stderr", command: "accounts", stderr: true },
+      { tag: "notifications stdout", command: "notifications", stderr: false },
+      { tag: "notifications stderr", command: "notifications", stderr: true },
+      { tag: "mark read stdout", command: "read", stderr: false },
+      { tag: "mark read stderr", command: "read", stderr: true }
+    ]
+  }
+
+  function test_structured_command_errors_show_message_not_json(data) {
+    var message = "Token refresh failed: network is unreachable"
+    var envelope = JSON.stringify({ ok: false, error: message })
+    var process
+    if (data.command === "read") {
+      process = beginRead("offline")
+    } else {
+      service.refresh()
+      findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+      if (data.command === "notifications") {
+        findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+        process = findNotificationListProcess()
+      } else {
+        process = findAccountsProcess()
+      }
+    }
+    process.complete(1, data.stderr ? "" : envelope, data.stderr ? envelope : "")
+    compare(service.lastError, data.command === "notifications" ? "One: " + message : message)
+    compare(service.authenticated, true)
+    if (data.command === "read") compare(service.actionStatus, message)
+    else compare(service.refreshing, false)
+  }
+
   function test_outdated_cli_stops_refreshing_and_flags_unsupported() {
     service.refresh()
     findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}', "0.8.1"), "")

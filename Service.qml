@@ -62,7 +62,15 @@ Item {
   }
 
   function conciseError(value, fallback) {
-    var text = String(value || fallback || "Basecamp request failed").replace(/\s+/g, " ").trim()
+    var text = String(value || fallback || "Basecamp request failed")
+    try {
+      var result = JSON.parse(text)
+      if (result && result.ok === false)
+        text = Model.cleanText(result.error || result.message || "The Basecamp CLI request failed")
+    } catch (error) {
+      // Plain-text CLI failures still carry useful diagnostics.
+    }
+    text = text.replace(/\s+/g, " ").trim()
     return text.length > 180 ? text.substring(0, 177) + "…" : text
   }
 
