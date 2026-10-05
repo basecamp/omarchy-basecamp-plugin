@@ -307,6 +307,80 @@ TestCase {
     compare(service.stateFilter, "unread")
   }
 
+  function test_closed_refresh_with_unread_resets_previous_tab() {
+    service.setStateFilter("previous")
+    service._fetchedNotifications = [{ id: "new", accountId: "42", unread: true }]
+    service.finishRefresh()
+    compare(service.stateFilter, "unread")
+  }
+
+  function test_closed_refresh_without_unread_keeps_previous_tab() {
+    service.setStateFilter("previous")
+    service._fetchedNotifications = [{ id: "old", accountId: "42", unread: false }]
+    service.finishRefresh()
+    compare(service.stateFilter, "previous")
+  }
+
+  function test_closed_refresh_checks_unread_across_accounts_without_changing_filter() {
+    service.accounts = [{ id: "1", name: "One" }, { id: "2", name: "Two" }]
+    service.setAccountFilter("1")
+    service.setStateFilter("previous")
+    service._fetchedNotifications = [{ id: "new", accountId: "2", unread: true }]
+    service.finishRefresh()
+    compare(service.stateFilter, "unread")
+    compare(service.accountFilter, "1")
+  }
+
+  function test_refresh_uses_panel_visibility_at_completion_data() {
+    return [
+      { tag: "closed throughout", initiallyOpen: false, finallyOpen: false, expected: "unread" },
+      { tag: "opened during hover refresh", initiallyOpen: false, finallyOpen: true, expected: "previous" },
+      { tag: "open throughout", initiallyOpen: true, finallyOpen: true, expected: "previous" },
+      { tag: "closed during refresh", initiallyOpen: true, finallyOpen: false, expected: "unread" }
+    ]
+  }
+
+  function test_refresh_uses_panel_visibility_at_completion(data) {
+    var view = createTemporaryObject(barViewComponent, this, { service: service })
+    service.setPanelOpen(view, data.initiallyOpen)
+    service.setStateFilter("previous")
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+    service.setPanelOpen(view, data.finallyOpen)
+    findNotificationListProcess().complete(0,
+      '{"ok":true,"data":{"unreads":[{"id":"new","unread_at":"2026-10-05T12:00:00Z"}],"reads":[]}}', "")
+    compare(service.stateFilter, data.expected)
+    compare(service.notifications[0].unread, true)
+  }
+
+  function test_one_closed_monitor_does_not_override_an_open_monitor() {
+    var viewA = createTemporaryObject(barViewComponent, this, { service: service })
+    var viewB = createTemporaryObject(barViewComponent, this, { service: service })
+    service.setPanelOpen(viewA, true)
+    service.setPanelOpen(viewA, true)
+    service.setPanelOpen(viewB, true)
+    service.setPanelOpen(viewA, false)
+    service.setPanelOpen(viewA, false)
+    service.setStateFilter("previous")
+    service._fetchedNotifications = [{ id: "new", accountId: "42", unread: true }]
+    service.finishRefresh()
+    compare(viewB.stateFilter, "previous")
+
+    service.setPanelOpen(viewB, false)
+    service.finishRefresh()
+    compare(viewA.stateFilter, "unread")
+    compare(viewB.stateFilter, "unread")
+  }
+
+  function test_failed_refresh_does_not_reset_previous_tab() {
+    service.notifications = [{ id: "existing", accountId: "42", unread: true }]
+    service.setStateFilter("previous")
+    service.refresh()
+    findProbeProcess().complete(0, "missing\n", "")
+    compare(service.stateFilter, "previous")
+  }
+
   function test_two_bar_views_share_account_and_state_filters() {
     var viewA = barViewComponent.createObject(this, { service: service })
     var viewB = barViewComponent.createObject(this, { service: service })

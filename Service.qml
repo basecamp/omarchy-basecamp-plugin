@@ -33,6 +33,7 @@ Item {
 
   property string accountFilter: ""
   property string stateFilter: "unread"
+  property var _openPanels: []
 
   property string _probeOutput: ""
   property string _accountsOutput: ""
@@ -71,6 +72,13 @@ Item {
 
   function setStateFilter(value) {
     stateFilter = String(value || "unread")
+  }
+
+  // Tab state is shared across monitors: never reset it while any panel is open.
+  function setPanelOpen(panel, opened) {
+    var index = _openPanels.indexOf(panel)
+    if (opened && index === -1) _openPanels.push(panel)
+    else if (!opened && index !== -1) _openPanels.splice(index, 1)
   }
 
   function ensureAccountFilter() {
@@ -205,6 +213,8 @@ Item {
 
   function finishRefresh() {
     notifications = Model.sortNotifications(_fetchedNotifications)
+    if (_openPanels.length === 0 && Model.unreadCount(notifications, "") > 0)
+      setStateFilter("unread")
     refreshing = false
     lastUpdated = new Date()
     lastError = _partialErrors.length > 0 ? _partialErrors.join(" · ") : ""
