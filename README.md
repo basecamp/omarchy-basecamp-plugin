@@ -62,12 +62,14 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Left-click the Basecamp logo to open or close the panel.
 - Hover over the logo to refresh.
 - Select an account to filter the combined feed.
-- Select `Unread` or `Previous notifications` below the Basecamp title.
+- Select `New for you` or `Previous notifications` below the Basecamp title.
+- The selected tab is remembered. If a refresh finishes with unread notifications in any account while all panels are closed, the tab resets to `New for you` without changing the account filter. Refreshes that finish while any panel is open leave the selected tab unchanged, including hover refreshes that finish after you open the panel.
 - Click a notification to open it. Unread notifications are also marked as read.
 - Hover the unread count on a notification to reveal a dismiss control. Click it to mark the item as read without opening it.
 - Use the up and down arrow keys to move through notifications.
 - Use the left and right arrow keys to move through account filters.
 - Press `U` for unread notifications, `P` for previous notifications, or `R` to refresh.
+- CLI failures show their error message rather than the raw JSON response. A token-refresh failure can result from lost connectivity; restore the connection and refresh before assuming the login is invalid.
 
 ## Development
 

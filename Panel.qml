@@ -17,6 +17,7 @@ Panel {
   property int selectedIndex: 0
   property bool cursorActive: false
   property double nowMs: Date.now()
+  property var visibilityService: null
 
   QtObject {
     id: dummyService
@@ -56,6 +57,20 @@ Panel {
   readonly property var service: hostedService !== null ? hostedService : dummyService
   readonly property string accountFilter: service.accountFilter
   readonly property string stateFilter: service.stateFilter
+
+  function syncPanelVisibility() {
+    if (visibilityService !== hostedService) {
+      if (visibilityService !== null) visibilityService.setPanelOpen(root, false)
+      visibilityService = hostedService
+    }
+    if (visibilityService !== null) visibilityService.setPanelOpen(root, opened)
+  }
+
+  onHostedServiceChanged: syncPanelVisibility()
+  Component.onCompleted: syncPanelVisibility()
+  Component.onDestruction: {
+    if (visibilityService !== null) visibilityService.setPanelOpen(root, false)
+  }
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -223,13 +238,16 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  onOpenedChanged: if (opened) {
-    cursorActive = false
-    nowMs = Date.now()
-    if (panelFlick) panelFlick.contentY = 0
-    service.checkSetupRunning()
-    service.refreshIfStale()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  onOpenedChanged: {
+    syncPanelVisibility()
+    if (opened) {
+      cursorActive = false
+      nowMs = Date.now()
+      if (panelFlick) panelFlick.contentY = 0
+      service.checkSetupRunning()
+      service.refreshIfStale()
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
   }
 
   onFilteredNotificationsChanged: ensureSelection()
