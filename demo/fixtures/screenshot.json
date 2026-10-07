@@ -151,6 +151,42 @@
       "content_excerpt": "A concise summary of the customer interviews and recurring themes.",
       "bucket_name": "Customer research",
       "creator": { "name": "Jordan Lee" }
+    },
+    {
+      "id": 513,
+      "account_id": 1001,
+      "state": "bubbled",
+      "section": "bubbles",
+      "minutes_ago": 9,
+      "type": "Document",
+      "title": "Launch day run-of-show",
+      "content_excerpt": "Final timings for the announcement, support coverage, and social posts.",
+      "bucket_name": "Product launch",
+      "creator": { "name": "Sofia Patel" }
+    },
+    {
+      "id": 514,
+      "account_id": 1001,
+      "state": "bubbled",
+      "section": "bubbles",
+      "minutes_ago": 95,
+      "type": "Bulletin",
+      "title": "Holiday schedule for the support team",
+      "content_excerpt": "Coverage for the last two weeks of December is posted. Swap shifts by Friday.",
+      "bucket_name": "Company HQ",
+      "creator": { "name": "Maya Chen" }
+    },
+    {
+      "id": 515,
+      "account_id": 1002,
+      "state": "bubbled",
+      "section": "bubbles",
+      "minutes_ago": 240,
+      "type": "Comment",
+      "title": "Re: Pricing page experiments",
+      "content_excerpt": "Let’s revisit the annual plan test once we have two full weeks of data.",
+      "bucket_name": "Growth",
+      "creator": { "name": "Eli Thompson" }
     }
   ]
 }

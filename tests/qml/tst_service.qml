@@ -484,4 +484,42 @@ TestCase {
     service.setStateFilter("")
     compare(service.stateFilter, "unread")
   }
+  function bubbleUp(id, accountId) {
+    return { id: String(id), accountId: String(accountId), unread: false, bubbledUp: true }
+  }
+
+  function test_bubbled_tab_requires_bubble_ups_in_the_selected_account() {
+    service.accounts = [{ id: "1", name: "One" }, { id: "2", name: "Two" }]
+    service.notifications = [bubbleUp("b", "1")]
+    service.setAccountFilter("2")
+    service.setStateFilter("previous")
+
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "previous")
+
+    service.setAccountFilter("1")
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "bubbled")
+  }
+
+  function test_bubbled_tab_falls_back_when_the_account_filter_has_none() {
+    service.accounts = [{ id: "1", name: "One" }, { id: "2", name: "Two" }]
+    service.notifications = [bubbleUp("b", "1")]
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "bubbled")
+
+    service.setAccountFilter("2")
+    compare(service.bubbledUpCount, 0)
+    compare(service.stateFilter, "unread")
+  }
+
+  function test_bubbled_tab_falls_back_when_a_refresh_removes_the_last_bubble_up() {
+    service.notifications = [bubbleUp("b", "1")]
+    service.setStateFilter("bubbled")
+
+    service._fetchedNotifications = [{ id: "old", accountId: "1", unread: false, bubbledUp: false }]
+    service.finishRefresh()
+    compare(service.stateFilter, "unread")
+  }
+
 }

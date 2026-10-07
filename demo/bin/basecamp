@@ -107,9 +107,13 @@ def list_notifications(fixture, args):
     now = datetime.now(timezone.utc)
     unreads = []
     reads = []
+    bubble_ups = []
 
     for source in fixture["notifications"]:
         if str(source["account_id"]) != str(account_id):
+            continue
+        if source.get("state") == "bubbled":
+            bubble_ups.append(rendered_notification(source, True, now))
             continue
         read_key = f"{account_id}:{source['id']}"
         read = source.get("state") == "read" or read_key in read_ids
@@ -119,10 +123,13 @@ def list_notifications(fixture, args):
     key = lambda item: item["updated_at"]
     unreads.sort(key=key, reverse=True)
     reads.sort(key=key, reverse=True)
+    bubble_ups.sort(key=key, reverse=True)
     print(json.dumps({
         "ok": True,
         "data": {
-            "bubble_ups_count": 0,
+            "bubble_ups": bubble_ups,
+            "bubble_ups_count": len(bubble_ups),
+            "scheduled_bubble_ups_count": 0,
             "unreads": unreads,
             "reads": reads
         }

@@ -49,17 +49,23 @@ test("demo CLI fixtures follow the production account and notification contracts
 
     const allNotifications = []
     const rawNotifications = []
+    const bubbleUpCounts = []
     for (const account of parsedAccounts.accounts) {
       const result = successfulJson([
         "notifications", "list", "--account", account.id, "--json"
       ], stateDir)
-      rawNotifications.push(...result.data.unreads, ...result.data.reads)
+      rawNotifications.push(...result.data.unreads, ...result.data.reads, ...result.data.bubble_ups)
 
       const parsed = Model.parseNotifications(JSON.stringify(result), account, 50)
       assert.equal(parsed.ok, true)
       assert.ok(parsed.items.length > 0)
+      bubbleUpCounts.push(parsed.items.filter(item => item.bubbledUp).length)
       allNotifications.push(...parsed.items)
     }
+
+    // The demo must show the bubbled tab for some accounts and hide it for others.
+    assert.ok(bubbleUpCounts.some(count => count > 0))
+    assert.ok(bubbleUpCounts.some(count => count === 0))
 
     const ids = rawNotifications.map(item => String(item.id))
     assert.equal(new Set(ids).size, ids.length)

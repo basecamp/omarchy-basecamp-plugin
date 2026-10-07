@@ -23,6 +23,7 @@ Item {
   property var accounts: []
   property var notifications: []
   readonly property int unreadCount: Model.unreadCount(notifications, accountFilter)
+  readonly property int bubbledUpCount: Model.filterNotifications(notifications, accountFilter, "bubbled").length
   property date lastUpdated: new Date(0)
   property string lastError: ""
   property string actionStatus: ""
@@ -78,8 +79,12 @@ Item {
     accountFilter = String(value || "")
   }
 
+  // The bubbled tab only exists while the selected account view has
+  // bubble-ups, so it can never be selected empty.
   function setStateFilter(value) {
-    stateFilter = String(value || "unread")
+    var next = String(value || "unread")
+    if (next === "bubbled" && bubbledUpCount === 0) return
+    stateFilter = next
   }
 
   // Tab state is shared across monitors: never reset it while any panel is open.
@@ -98,6 +103,10 @@ Item {
   }
 
   onAccountsChanged: ensureAccountFilter()
+
+  // Leave the bubbled tab once its last item is gone, whether a refresh
+  // removed it or the account filter moved to an account without any.
+  onBubbledUpCountChanged: if (stateFilter === "bubbled" && bubbledUpCount === 0) setStateFilter("unread")
 
   function refreshIfStale() {
     var updatedAt = lastUpdated instanceof Date ? lastUpdated.getTime() : 0

@@ -31,6 +31,7 @@ Panel {
     property var accounts: []
     property var notifications: []
     property int unreadCount: 0
+    property int bubbledUpCount: 0
     property int accountCount: 0
     property string lastError: ""
     property string actionStatus: ""
@@ -393,6 +394,7 @@ Panel {
         if (text === "r" || text === "R") service.refresh()
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
+        else if ((text === "b" || text === "B") && service.bubbledUpCount > 0) root.setStateFilter("bubbled")
       }
 
       ColumnLayout {
@@ -564,6 +566,22 @@ Panel {
               horizontalPadding: Style.space(7)
               verticalPadding: Style.space(1)
               onClicked: root.setStateFilter("previous")
+            }
+
+            Button {
+              visible: service.bubbledUpCount > 0
+              text: "RECENTLY BUBBLED UP"
+              selected: root.stateFilter === "bubbled"
+              // Same color the bar logo uses for unread notifications, so a
+              // tab with items still in it stands out.
+              foreground: service.bubbledUpCount > 0 ? root.urgent : root.foreground
+              background: "transparent"
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(1)
+              onClicked: root.setStateFilter("bubbled")
             }
           }
         }
