@@ -76,6 +76,32 @@ test("parseNotifications preserves unread state and notification fields", () => 
   assert.equal(result.items[0].accountId, "42")
   assert.equal(result.items[1].unread, false)
 })
+test("parseNotifications files bubble-ups separately and drops scheduled and unknown sections", () => {
+  const result = Model.parseNotifications(payload({
+    reads: [notification({ id: 11 })],
+    bubble_ups: [notification({ id: 12, section: "bubbles", unread_at: "2026-08-14T13:05:00Z", read_at: null })],
+    scheduled_bubble_ups: [notification({ id: 13, section: "bubbles", bubble_up_at: "2026-08-20T13:00:00Z" })],
+    memories: [notification({ id: 14 })],
+    pinned: [notification({ id: 15 })],
+    bubble_ups_count: 1,
+    scheduled_bubble_ups_count: 1
+  }), account, 20)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.items.map(item => [item.id, item.unread, item.bubbledUp]), [
+    ["11", false, false],
+    ["12", false, true]
+  ])
+})
+
+test("parseNotifications caps notifications and bubble-ups independently", () => {
+  const reads = [1, 2, 3].map(minute => notification({ id: 100 + minute, updated_at: `2026-08-14T13:0${minute}:00Z` }))
+  const bubbleUps = [1, 2, 3].map(minute => notification({ id: 200 + minute, updated_at: `2026-08-14T12:0${minute}:00Z` }))
+
+  const result = Model.parseNotifications(payload({ reads, bubble_ups: bubbleUps }), account, 2)
+
+  assert.deepEqual(result.items.map(item => item.id), ["103", "102", "203", "202"])
+})
 
 test("normalizeAppUrl transforms basecampapi URLs to app.basecamp.com URLs", () => {
   assert.equal(
@@ -129,16 +155,21 @@ test("sortNotifications orders newest first with deterministic ties", () => {
   assert.deepEqual(Model.sortNotifications(items).map(item => item.id), ["c", "a", "b", "z"])
 })
 
-test("filterNotifications combines account and read-state filters without reordering", () => {
+test("filterNotifications combines account and tab filters without reordering", () => {
   const items = [
-    { id: "new-a", accountId: "a", unread: true },
-    { id: "new-b", accountId: "b", unread: true },
-    { id: "old-a", accountId: "a", unread: false }
+    { id: "new-a", accountId: "a", unread: true, bubbledUp: false },
+    { id: "new-b", accountId: "b", unread: true, bubbledUp: false },
+    { id: "old-a", accountId: "a", unread: false, bubbledUp: false },
+    { id: "bubble-a", accountId: "a", unread: false, bubbledUp: true },
+    { id: "bubble-b", accountId: "b", unread: false, bubbledUp: true }
   ]
 
   assert.deepEqual(Model.filterNotifications(items, "a", "unread").map(item => item.id), ["new-a"])
   assert.deepEqual(Model.filterNotifications(items, "a", "previous").map(item => item.id), ["old-a"])
-  assert.deepEqual(Model.filterNotifications(items, "", "all").map(item => item.id), ["new-a", "new-b", "old-a"])
+  assert.deepEqual(Model.filterNotifications(items, "a", "bubbled").map(item => item.id), ["bubble-a"])
+  assert.deepEqual(Model.filterNotifications(items, "", "bubbled").map(item => item.id), ["bubble-a", "bubble-b"])
+  assert.deepEqual(Model.filterNotifications(items, "", "all").map(item => item.id),
+    ["new-a", "new-b", "old-a", "bubble-a", "bubble-b"])
 })
 
 test("unreadCount counts all accounts or a single account", () => {

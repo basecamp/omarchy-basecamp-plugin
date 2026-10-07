@@ -108,6 +108,18 @@ function parseAccounts(raw) {
   return { ok: true, error: "", accounts: accounts }
 }
 
+// Each response key maps to exactly one tab. Everything else — Basecamp 5's
+// always-empty `memories` placeholder, `scheduled_bubble_ups` that have not
+// returned yet, and keys added later — stays out of the feed instead of
+// leaking into Previous notifications.
+var NOTIFICATION_SECTIONS = {
+  unreads: { unread: true, bubbledUp: false },
+  unread: { unread: true, bubbledUp: false },
+  reads: { unread: false, bubbledUp: false },
+  read: { unread: false, bubbledUp: false },
+  bubble_ups: { unread: false, bubbledUp: true }
+}
+
 function parseNotifications(raw, account, limit) {
   var result = parseJson(raw)
   if (!result.ok) return { ok: false, error: result.error, items: [] }
@@ -115,36 +127,35 @@ function parseNotifications(raw, account, limit) {
   var data = result.value.data
   var sections = []
   if (Array.isArray(data)) {
-    sections.push({ name: "notifications", items: data })
+    sections.push({ items: data, unread: false, bubbledUp: false })
   } else if (data && typeof data === "object") {
-    var preferred = ["unreads", "unread", "reads", "read", "memories", "memory"]
-    var used = {}
-    for (var p = 0; p < preferred.length; p++) {
-      var preferredName = preferred[p]
-      if (Array.isArray(data[preferredName])) {
-        sections.push({ name: preferredName, items: data[preferredName] })
-        used[preferredName] = true
-      }
-    }
-    for (var key in data) {
-      if (!used[key] && Array.isArray(data[key])) sections.push({ name: key, items: data[key] })
+    for (var key in NOTIFICATION_SECTIONS) {
+      if (!Array.isArray(data[key])) continue
+      var kind = NOTIFICATION_SECTIONS[key]
+      sections.push({ items: data[key], unread: kind.unread, bubbledUp: kind.bubbledUp })
     }
   }
 
-  var items = []
+  var notifications = []
+  var bubbleUps = []
   for (var s = 0; s < sections.length; s++) {
     var section = sections[s]
-    var unreadSection = String(section.name).toLowerCase().indexOf("unread") !== -1
+    var target = section.bubbledUp ? bubbleUps : notifications
     for (var n = 0; n < section.items.length; n++) {
-      var item = normalizeNotification(section.items[n], account, unreadSection)
-      if (item) items.push(item)
+      var item = normalizeNotification(section.items[n], account, section.unread, section.bubbledUp)
+      if (item) target.push(item)
     }
   }
 
-  items.sort(compareWithinAccount)
+  // Cap each group separately so bubble-ups never crowd out notifications.
   var count = positiveInteger(limit, 20)
-  if (items.length > count) items = items.slice(0, count)
-  return { ok: true, error: "", items: items }
+  notifications.sort(compareWithinAccount)
+  bubbleUps.sort(compareWithinAccount)
+  return {
+    ok: true,
+    error: "",
+    items: notifications.slice(0, count).concat(bubbleUps.slice(0, count))
+  }
 }
 
 function joinNames(names) {
@@ -173,7 +184,7 @@ function normalizeAppUrl(rawUrl) {
   return url.replace("https://3.basecampapi.com/", "https://app.basecamp.com/")
 }
 
-function normalizeNotification(value, account, unread) {
+function normalizeNotification(value, account, unread, bubbledUp) {
   var item = value || {}
   var id = String(item.id || "").trim()
   if (id === "") return null
@@ -201,7 +212,8 @@ function normalizeNotification(value, account, unread) {
     timestampMs: parsedTime,
     url: normalizeAppUrl(item.app_url),
     unread: unread === true,
-    unreadCount: positiveInteger(item.unread_count, 0)
+    unreadCount: positiveInteger(item.unread_count, 0),
+    bubbledUp: bubbledUp === true
   }
 }
 
@@ -228,8 +240,9 @@ function filterNotifications(items, accountId, state) {
   var selectedState = String(state || "all")
   return source.filter(function(item) {
     if (selectedAccount !== "" && String(item.accountId || "") !== selectedAccount) return false
-    if (selectedState === "unread") return item.unread === true
-    if (selectedState === "previous") return item.unread !== true
+    if (selectedState === "unread") return item.unread === true && item.bubbledUp !== true
+    if (selectedState === "previous") return item.unread !== true && item.bubbledUp !== true
+    if (selectedState === "bubbled") return item.bubbledUp === true
     return true
   })
 }
