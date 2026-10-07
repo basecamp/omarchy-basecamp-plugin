@@ -61,7 +61,7 @@ TestCase {
   }
 
   function probeOutput(authOutput, version) {
-    var cliVersion = version === undefined ? "0.9.1" : version
+    var cliVersion = version === undefined ? "0.12.0" : version
     return "basecamp-version:basecamp version " + String(cliVersion) + "\n" + String(authOutput || "")
   }
 
@@ -484,6 +484,7 @@ TestCase {
     service.setStateFilter("")
     compare(service.stateFilter, "unread")
   }
+
   function bubbleUp(id, accountId) {
     return { id: String(id), accountId: String(accountId), unread: false, bubbledUp: true }
   }
@@ -522,4 +523,72 @@ TestCase {
     compare(service.stateFilter, "unread")
   }
 
+  function findBubbleUpRemoveProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length >= 3
+          && process.command[0] === "basecamp"
+          && process.command[1] === "bubble-up"
+          && process.command[2] === "remove") return process
+    }
+    return null
+  }
+
+  function poppableBubbleUp(id, accountId, recordingId) {
+    var item = bubbleUp(id, accountId)
+    item.recordingId = String(recordingId)
+    return item
+  }
+
+  function test_pop_removes_the_bubble_up_and_runs_the_cli() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = [item, { id: "old", accountId: "42", unread: false, bubbledUp: false }]
+    service.popBubbleUp(item)
+
+    compare(service.notifications.map(function(n) { return n.id }), ["old"])
+    compare(service.actionStatus, "Popping bubble-up…")
+    var process = findBubbleUpRemoveProcess()
+    verify(process !== null)
+    verify(process.running)
+    compare(process.command, ["basecamp", "bubble-up", "remove", "9001", "--account", "42", "--json"])
+
+    process.complete(0, '{"ok":true,"data":{"id":9001,"bubbled_up":false}}', "")
+    compare(service.actionStatus, "Popped bubble-up")
+  }
+
+  function test_failed_pop_shows_the_cli_error() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = [item]
+    service.popBubbleUp(item)
+
+    findBubbleUpRemoveProcess().complete(1, "", '{"ok":false,"error":"Recording not found"}')
+    compare(service.lastError, "Recording not found")
+    compare(service.actionStatus, "Recording not found")
+  }
+
+  function test_pop_ignores_items_it_cannot_pop() {
+    var unread = { id: "u", accountId: "42", unread: true, bubbledUp: false, recordingId: "1" }
+    var withoutRecording = poppableBubbleUp("b", "42", "")
+    service.notifications = [unread, withoutRecording]
+
+    service.popBubbleUp(unread)
+    service.popBubbleUp(withoutRecording)
+    compare(service.notifications.length, 2)
+    compare(findBubbleUpRemoveProcess(), null)
+  }
+
+  function test_pop_waits_for_a_running_read() {
+    var readProcess = beginRead("first")
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = service.notifications.concat([item])
+    service.popBubbleUp(item)
+    compare(service.actionStatus, "Marking notification as read…")
+    compare(findBubbleUpRemoveProcess(), null)
+
+    readProcess.complete(0, "{}", "")
+    compare(service.actionStatus, "Popping bubble-up…")
+    var popProcess = findBubbleUpRemoveProcess()
+    verify(popProcess !== null)
+    verify(popProcess.running)
+  }
 }

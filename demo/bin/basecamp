@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 import tempfile
 from copy import deepcopy
@@ -103,7 +104,9 @@ def list_accounts(fixture):
 def list_notifications(fixture, args):
     account_id = option(args, "--account")
     account_by_id(fixture, account_id)
-    read_ids = {str(value) for value in load_state().get("read_ids", [])}
+    state = load_state()
+    read_ids = {str(value) for value in state.get("read_ids", [])}
+    popped_ids = {str(value) for value in state.get("popped_ids", [])}
     now = datetime.now(timezone.utc)
     unreads = []
     reads = []
@@ -113,7 +116,8 @@ def list_notifications(fixture, args):
         if str(source["account_id"]) != str(account_id):
             continue
         if source.get("state") == "bubbled":
-            bubble_ups.append(rendered_notification(source, True, now))
+            if f"{account_id}:{recording_id(source)}" not in popped_ids:
+                bubble_ups.append(rendered_notification(source, True, now))
             continue
         read_key = f"{account_id}:{source['id']}"
         read = source.get("state") == "read" or read_key in read_ids
@@ -151,12 +155,35 @@ def mark_notification_read(fixture, args):
     print(json.dumps({"ok": True, "data": {"id": notification_id}}))
 
 
+def recording_id(source):
+    match = re.search(r"/recordings/(\d+)/subscription\.json", source.get("subscription_url", ""))
+    return match.group(1) if match else ""
+
+
+def pop_bubble_up(fixture, args):
+    popped_recording = args[2]
+    account_id = option(args, "--account")
+    account_by_id(fixture, account_id)
+    if not any(str(source["account_id"]) == str(account_id)
+               and source.get("state") == "bubbled"
+               and recording_id(source) == popped_recording
+               for source in fixture["notifications"]):
+        fail(f"Unknown demo bubble-up recording: {popped_recording}")
+
+    state = load_state()
+    popped_ids = {str(value) for value in state.get("popped_ids", [])}
+    popped_ids.add(f"{account_id}:{popped_recording}")
+    state["popped_ids"] = sorted(popped_ids)
+    save_state(state)
+    print(json.dumps({"ok": True, "data": {"id": int(popped_recording), "bubbled_up": False}}))
+
+
 def main():
     fixture = load_fixture()
     args = sys.argv[1:]
 
     if args == ["version"]:
-        print("basecamp version 0.9.1")
+        print("basecamp version 0.12.0")
     elif args == ["auth", "status", "--json"]:
         auth_status()
     elif args == ["accounts", "list", "--json"]:
@@ -167,6 +194,9 @@ def main():
     elif (len(args) == 6 and args[:2] == ["notifications", "read"]
           and args[3] == "--account" and args[5] == "--json"):
         mark_notification_read(fixture, args)
+    elif (len(args) == 6 and args[:2] == ["bubble-up", "remove"]
+          and args[3] == "--account" and args[5] == "--json"):
+        pop_bubble_up(fixture, args)
     else:
         fail("Unsupported demo Basecamp CLI command: " + " ".join(args))
 

@@ -37,7 +37,7 @@ test("demo CLI fixtures follow the production account and notification contracts
   withState(stateDir => {
     const version = demo(["version"], stateDir)
     assert.equal(version.status, 0, version.stderr)
-    assert.equal(version.stdout.trim(), "basecamp version 0.9.1")
+    assert.equal(version.stdout.trim(), "basecamp version 0.12.0")
 
     const auth = successfulJson(["auth", "status", "--json"], stateDir)
     assert.equal(auth.data.authenticated, true)
@@ -59,7 +59,9 @@ test("demo CLI fixtures follow the production account and notification contracts
       const parsed = Model.parseNotifications(JSON.stringify(result), account, 50)
       assert.equal(parsed.ok, true)
       assert.ok(parsed.items.length > 0)
-      bubbleUpCounts.push(parsed.items.filter(item => item.bubbledUp).length)
+      const bubbleUps = parsed.items.filter(item => item.bubbledUp)
+      assert.ok(bubbleUps.every(item => item.recordingId !== ""))
+      bubbleUpCounts.push(bubbleUps.length)
       allNotifications.push(...parsed.items)
     }
 
@@ -102,6 +104,24 @@ test("demo CLI keeps mark-as-read state for subsequent refreshes", () => {
     ], stateDir)
     assert.ok(!after.data.unreads.some(item => String(item.id) === "501"))
     assert.ok(after.data.reads.some(item => String(item.id) === "501"))
+  })
+})
+
+test("demo CLI pops bubble-ups for subsequent refreshes", () => {
+  withState(stateDir => {
+    const list = account => Model.parseNotifications(JSON.stringify(successfulJson([
+      "notifications", "list", "--account", account, "--json"
+    ], stateDir)), { id: account, name: "Demo" }, 50).items.filter(item => item.bubbledUp)
+
+    const [popped, kept] = list("1001")
+    assert.ok(popped && kept)
+    const result = successfulJson([
+      "bubble-up", "remove", popped.recordingId, "--account", "1001", "--json"
+    ], stateDir)
+    assert.equal(result.data.bubbled_up, false)
+
+    assert.deepEqual(list("1001").map(item => item.id), [kept.id])
+    assert.equal(list("1002").length, 1)
   })
 })
 

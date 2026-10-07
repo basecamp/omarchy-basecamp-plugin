@@ -41,6 +41,7 @@ Panel {
     function refreshIfStale() {}
     function openNotification() {}
     function markRead() {}
+    function popBubbleUp() {}
     function setAccountFilter() {}
     function setStateFilter() {}
     function tryStartSetup() { return false }
@@ -729,7 +730,8 @@ Panel {
 
                 PanelToolTip {
                   visible: rowMouse.containsMouse
-                  text: (notificationRow.modelData.type || "Notification") + (notificationRow.modelData.unread ? " · Unread" : " · Read")
+                  text: (notificationRow.modelData.type || "Notification")
+                    + (notificationRow.modelData.bubbledUp ? " · Bubbled up" : notificationRow.modelData.unread ? " · Unread" : " · Read")
                   fontFamily: root.fontFamily
                 }
 
@@ -813,7 +815,9 @@ Panel {
                   }
 
                   Rectangle {
+                    // Unread rows dismiss through this pill; bubble-ups pop through it.
                     visible: notificationRow.modelData.unread
+                      || (notificationRow.modelData.bubbledUp && notificationRow.modelData.recordingId !== "")
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: Style.space(2)
                     Layout.preferredHeight: Style.space(16)
@@ -855,7 +859,10 @@ Panel {
                       onPositionChanged: function(mouse) {
                         if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
                       }
-                      onClicked: service.markRead(notificationRow.modelData)
+                      onClicked: {
+                        if (notificationRow.modelData.bubbledUp) service.popBubbleUp(notificationRow.modelData)
+                        else service.markRead(notificationRow.modelData)
+                      }
                     }
                   }
                 }

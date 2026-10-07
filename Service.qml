@@ -45,10 +45,10 @@ Item {
   property var _currentAccount: null
   property string _notificationsOutput: ""
   property string _notificationsError: ""
-  property var _readQueue: []
-  property var _readingNotification: null
-  property string _readOutput: ""
-  property string _readError: ""
+  property var _actionQueue: []
+  property var _currentAction: null
+  property string _actionOutput: ""
+  property string _actionError: ""
   property var _partialErrors: []
 
   function setting(name, fallback) {
@@ -246,10 +246,25 @@ Item {
   function markRead(item) {
     if (!item || !item.unread) return
     setReadOptimistically(item)
-    var queue = _readQueue.slice()
-    queue.push(item)
-    _readQueue = queue
-    runNextRead()
+    enqueueAction({
+      command: ["basecamp", "notifications", "read", String(item.id), "--account", String(item.accountId), "--json"],
+      pending: "Marking notification as read…",
+      done: "Marked as read",
+      failure: "Could not mark the notification as read"
+    })
+  }
+
+  function popBubbleUp(item) {
+    if (!item || item.bubbledUp !== true || !item.recordingId) return
+    notifications = notifications.filter(function(existing) {
+      return !(existing.bubbledUp === true && existing.id === item.id && existing.accountId === item.accountId)
+    })
+    enqueueAction({
+      command: ["basecamp", "bubble-up", "remove", String(item.recordingId), "--account", String(item.accountId), "--json"],
+      pending: "Popping bubble-up…",
+      done: "Popped bubble-up",
+      failure: "Could not pop the bubble-up"
+    })
   }
 
   function setReadOptimistically(item) {
@@ -268,35 +283,39 @@ Item {
     notifications = changed
   }
 
-  function runNextRead() {
-    if (readProcess.running || _readQueue.length === 0) return
-    var queue = _readQueue.slice()
-    _readingNotification = queue.shift()
-    _readQueue = queue
-    _readOutput = ""
-    _readError = ""
-    actionStatusTimer.stop()
-    actionStatus = "Marking notification as read…"
-    readProcess.command = [
-      "basecamp", "notifications", "read",
-      String(_readingNotification.id),
-      "--account", String(_readingNotification.accountId),
-      "--json"
-    ]
-    readProcess.running = true
+  // Reads and pops share one CLI process so their status messages never
+  // interleave: each action starts only after the previous one exits.
+  function enqueueAction(action) {
+    var queue = _actionQueue.slice()
+    queue.push(action)
+    _actionQueue = queue
+    runNextAction()
   }
 
-  function finishRead(exitCode, stdout, stderr) {
+  function runNextAction() {
+    if (actionProcess.running || _actionQueue.length === 0) return
+    var queue = _actionQueue.slice()
+    _currentAction = queue.shift()
+    _actionQueue = queue
+    _actionOutput = ""
+    _actionError = ""
+    actionStatusTimer.stop()
+    actionStatus = _currentAction.pending
+    actionProcess.command = _currentAction.command
+    actionProcess.running = true
+  }
+
+  function finishAction(exitCode, stdout, stderr) {
     if (exitCode !== 0) {
-      lastError = conciseError(stderr || stdout, "Could not mark the notification as read")
+      lastError = conciseError(stderr || stdout, _currentAction.failure)
       actionStatus = lastError
     } else {
-      actionStatus = "Marked as read"
+      actionStatus = _currentAction.done
     }
     actionStatusTimer.restart()
-    _readingNotification = null
-    if (_readQueue.length > 0) runNextRead()
-    else refreshAfterRead.restart()
+    _currentAction = null
+    if (_actionQueue.length > 0) runNextAction()
+    else refreshAfterAction.restart()
   }
 
   Timer {
@@ -309,7 +328,7 @@ Item {
   }
 
   Timer {
-    id: refreshAfterRead
+    id: refreshAfterAction
     interval: 1200
     repeat: false
     onTriggered: root.refresh()
@@ -425,23 +444,23 @@ Item {
   }
 
   Process {
-    id: readProcess
+    id: actionProcess
     running: false
     command: []
     stdout: StdioCollector {
-      id: readStdout
+      id: actionStdout
       waitForEnd: true
-      onStreamFinished: root._readOutput = text
+      onStreamFinished: root._actionOutput = text
     }
     stderr: StdioCollector {
-      id: readStderr
+      id: actionStderr
       waitForEnd: true
-      onStreamFinished: root._readError = text
+      onStreamFinished: root._actionError = text
     }
     onExited: function(exitCode) {
-      var stdout = String(readStdout.text || root._readOutput || "")
-      var stderr = String(readStderr.text || root._readError || "")
-      root.finishRead(exitCode, stdout, stderr)
+      var stdout = String(actionStdout.text || root._actionOutput || "")
+      var stderr = String(actionStderr.text || root._actionError || "")
+      root.finishAction(exitCode, stdout, stderr)
     }
   }
 }

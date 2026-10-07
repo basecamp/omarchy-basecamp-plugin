@@ -20,30 +20,26 @@ function payload(data) {
   return JSON.stringify({ data })
 }
 
-test("parseCliVersion requires Basecamp CLI 0.9 or newer", () => {
-  assert.deepEqual(Model.parseCliVersion("basecamp version 0.8.1"), {
+test("parseCliVersion requires Basecamp CLI 0.10 or newer", () => {
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.1"), {
     ok: true,
     error: "",
-    version: "0.8.1",
+    version: "0.9.1",
     supported: false
   })
-  assert.equal(Model.parseCliVersion("basecamp version 0.9.0").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.8.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.10").supported, false)
   assert.equal(Model.parseCliVersion("basecamp version 0.10.0").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.12.0").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 1.0.0").supported, true)
-  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.0+linux.x86-64"), {
+  assert.deepEqual(Model.parseCliVersion("basecamp version 0.10.0+linux.x86-64"), {
     ok: true,
     error: "",
-    version: "0.9.0+linux.x86-64",
+    version: "0.10.0+linux.x86-64",
     supported: true
   })
-  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.1+linux.x86-64"), {
-    ok: true,
-    error: "",
-    version: "0.9.1+linux.x86-64",
-    supported: true
-  })
-  assert.equal(Model.parseCliVersion("basecamp version 0.9.0-rc.1").supported, false)
-  assert.equal(Model.parseCliVersion("basecamp version 0.9.1-rc.1").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.10.0-rc.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.10.1-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 1.0.0-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("unexpected output").ok, false)
 })
@@ -92,6 +88,17 @@ test("parseNotifications files bubble-ups separately and drops scheduled and unk
     ["11", false, false],
     ["12", false, true]
   ])
+})
+
+test("parseNotifications takes the recording id from the subscription URL", () => {
+  const result = Model.parseNotifications(payload({
+    bubble_ups: [
+      notification({ id: 12, subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json" }),
+      notification({ id: 13 })
+    ]
+  }), account, 20)
+
+  assert.deepEqual(result.items.map(item => [item.id, item.recordingId]), [["12", "9001"], ["13", ""]])
 })
 
 test("parseNotifications caps notifications and bubble-ups independently", () => {
@@ -209,6 +216,11 @@ test("notificationBadgeText shows the unread count until hovered, then a dismiss
   assert.equal(dismiss, Model.notificationBadgeText({}, true))
 })
 
+test("notificationBadgeText marks bubble-ups with an arrow until hovered, then a pop glyph", () => {
+  assert.equal(Model.notificationBadgeText({ bubbledUp: true }, false), "󰜷")
+  assert.equal(Model.notificationBadgeText({ bubbledUp: true }, true), "󰅖")
+})
+
 test("invalid CLI output returns a useful parse failure", () => {
   assert.deepEqual(Model.parseAccounts("not json"), {
     ok: false,
@@ -234,7 +246,7 @@ test("setupPlan maps each setup state to its fix, worst problem first", () => {
     Model.setupLaunchCommand("omarchy-pkg-add basecamp-cli && basecamp auth login", "37signals.basecamp"))
 
   const update = Model.setupPlan(true, false, true, "37signals.basecamp")
-  assert.equal(update.title, "Basecamp CLI 0.9 or newer is required")
+  assert.equal(update.title, "Basecamp CLI 0.10 or newer is required")
   assert.equal(update.buttonLabel, "Update Omarchy…")
   assert.equal(update.command, "omarchy update")
   assert.equal(update.launchCommand,
