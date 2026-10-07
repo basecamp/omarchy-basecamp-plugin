@@ -68,7 +68,7 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - The selected tab is remembered. If a refresh finishes with unread notifications in any account while all panels are closed, the tab resets to `New for you` without changing the account filter. Refreshes that finish while any panel is open leave the selected tab unchanged, including hover refreshes that finish after you open the panel.
 - Click a notification to open it. Unread notifications are also marked as read.
 - Hover the unread count on a notification to reveal a dismiss control. Click it to mark the item as read without opening it.
-- Hover the arrow badge on a bubbled-up item to reveal a pop control. Click it to pop the bubble-up without opening the item.
+- Hover the arrow badge on a bubbled-up item to reveal a pop control. Click it to pop the bubble-up without opening the item. The row disappears immediately; a successful follow-up refresh restores it if the pop failed. That refresh waits for any active refresh or queued read/pop actions to finish.
 - Use the up and down arrow keys to move through notifications.
 - Use the left and right arrow keys to move through account filters.
 - Press `U` for unread notifications, `P` for previous notifications, `B` for recently bubbled up items, or `R` to refresh.

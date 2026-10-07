@@ -331,7 +331,12 @@ Item {
     id: refreshAfterAction
     interval: 1200
     repeat: false
-    onTriggered: root.refresh()
+    onTriggered: {
+      // A refresh that predates the action can publish stale data. Keep
+      // the follow-up pending until both that refresh and later actions end.
+      if (root.refreshing || actionProcess.running) restart()
+      else root.refresh()
+    }
   }
 
   Timer {

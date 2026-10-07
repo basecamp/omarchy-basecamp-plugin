@@ -591,4 +591,72 @@ TestCase {
     verify(popProcess !== null)
     verify(popProcess.running)
   }
+
+  function test_post_action_refresh_survives_an_active_refresh_data() {
+    return [
+      { tag: "successful pop", exitCode: 0, expectedIds: [] },
+      { tag: "failed pop", exitCode: 1, expectedIds: ["b"] }
+    ]
+  }
+
+  function test_post_action_refresh_survives_an_active_refresh(data) {
+    var item = poppableBubbleUp("b", "42", "9001")
+    var rawItem = {
+      id: "b",
+      subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json"
+    }
+    var accounts = '{"ok":true,"data":[{"id":42,"name":"One"},{"id":43,"name":"Two"}]}'
+    service.notifications = [item]
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, accounts, "")
+    var list = findNotificationListProcess()
+    list.complete(0, JSON.stringify({ ok: true, data: { bubble_ups: [rawItem] } }), "")
+
+    // Account One's response predates the pop; Account Two keeps the
+    // refresh in flight until the post-action timer has fired.
+    service.popBubbleUp(item)
+    findBubbleUpRemoveProcess().complete(data.exitCode, "{}", data.exitCode ? "Permission denied" : "")
+    wait(1300)
+    compare(service.refreshing, true)
+    list.complete(0, '{"ok":true,"data":{}}', "")
+    compare(service.notifications.map(function(n) { return n.id }), ["b"])
+
+    tryVerify(function() { return findProbeProcess() !== null }, 2000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, accounts, "")
+    list.complete(0, JSON.stringify({
+      ok: true,
+      data: { bubble_ups: data.exitCode ? [rawItem] : [] }
+    }), "")
+    list.complete(0, '{"ok":true,"data":{}}', "")
+    compare(service.refreshing, false)
+    compare(service.notifications.map(function(n) { return n.id }), data.expectedIds)
+  }
+
+  function test_post_action_refresh_waits_for_a_later_running_action() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    // Let triggeredOnStart run before completing the initial refresh,
+    // otherwise it can start an unrelated fetch during the later action.
+    tryVerify(function() { return findProbeProcess() !== null }, 1000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+    findNotificationListProcess().complete(0, '{"ok":true,"data":{}}', "")
+    service.notifications = [item]
+    service.popBubbleUp(item)
+    findBubbleUpRemoveProcess().complete(0, "{}", "")
+
+    var read = beginRead("later")
+    wait(1300)
+    compare(service.refreshing, false)
+    compare(service.notifications[0].unread, false)
+
+    read.complete(0, "{}", "")
+    tryVerify(function() { return findProbeProcess() !== null }, 2000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+    findNotificationListProcess().complete(0, '{"ok":true,"data":{"reads":[{"id":"later"}]}}', "")
+    compare(service.notifications.map(function(n) { return n.id }), ["later"])
+    compare(service.notifications[0].unread, false)
+  }
 }
