@@ -37,7 +37,7 @@ test("demo CLI fixtures follow the production account and notification contracts
   withState(stateDir => {
     const version = demo(["version"], stateDir)
     assert.equal(version.status, 0, version.stderr)
-    assert.equal(version.stdout.trim(), "basecamp version 0.9.1")
+    assert.equal(version.stdout.trim(), "basecamp version 0.12.0")
 
     const auth = successfulJson(["auth", "status", "--json"], stateDir)
     assert.equal(auth.data.authenticated, true)
@@ -49,17 +49,25 @@ test("demo CLI fixtures follow the production account and notification contracts
 
     const allNotifications = []
     const rawNotifications = []
+    const bubbleUpCounts = []
     for (const account of parsedAccounts.accounts) {
       const result = successfulJson([
         "notifications", "list", "--account", account.id, "--json"
       ], stateDir)
-      rawNotifications.push(...result.data.unreads, ...result.data.reads)
+      rawNotifications.push(...result.data.unreads, ...result.data.reads, ...result.data.bubble_ups)
 
       const parsed = Model.parseNotifications(JSON.stringify(result), account, 50)
       assert.equal(parsed.ok, true)
       assert.ok(parsed.items.length > 0)
+      const bubbleUps = parsed.items.filter(item => item.bubbledUp)
+      assert.ok(bubbleUps.every(item => item.recordingId !== ""))
+      bubbleUpCounts.push(bubbleUps.length)
       allNotifications.push(...parsed.items)
     }
+
+    // The demo must show the bubbled tab for some accounts and hide it for others.
+    assert.ok(bubbleUpCounts.some(count => count > 0))
+    assert.ok(bubbleUpCounts.some(count => count === 0))
 
     const ids = rawNotifications.map(item => String(item.id))
     assert.equal(new Set(ids).size, ids.length)
@@ -96,6 +104,24 @@ test("demo CLI keeps mark-as-read state for subsequent refreshes", () => {
     ], stateDir)
     assert.ok(!after.data.unreads.some(item => String(item.id) === "501"))
     assert.ok(after.data.reads.some(item => String(item.id) === "501"))
+  })
+})
+
+test("demo CLI pops bubble-ups for subsequent refreshes", () => {
+  withState(stateDir => {
+    const list = account => Model.parseNotifications(JSON.stringify(successfulJson([
+      "notifications", "list", "--account", account, "--json"
+    ], stateDir)), { id: account, name: "Demo" }, 50).items.filter(item => item.bubbledUp)
+
+    const [popped, kept] = list("1001")
+    assert.ok(popped && kept)
+    const result = successfulJson([
+      "bubble-up", "remove", popped.recordingId, "--account", "1001", "--json"
+    ], stateDir)
+    assert.equal(result.data.bubbled_up, false)
+
+    assert.deepEqual(list("1001").map(item => item.id), [kept.id])
+    assert.equal(list("1002").length, 1)
   })
 })
 

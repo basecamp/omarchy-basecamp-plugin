@@ -61,7 +61,7 @@ TestCase {
   }
 
   function probeOutput(authOutput, version) {
-    var cliVersion = version === undefined ? "0.9.1" : version
+    var cliVersion = version === undefined ? "0.12.0" : version
     return "basecamp-version:basecamp version " + String(cliVersion) + "\n" + String(authOutput || "")
   }
 
@@ -483,5 +483,180 @@ TestCase {
     service.setStateFilter("previous")
     service.setStateFilter("")
     compare(service.stateFilter, "unread")
+  }
+
+  function bubbleUp(id, accountId) {
+    return { id: String(id), accountId: String(accountId), unread: false, bubbledUp: true }
+  }
+
+  function test_bubbled_tab_requires_bubble_ups_in_the_selected_account() {
+    service.accounts = [{ id: "1", name: "One" }, { id: "2", name: "Two" }]
+    service.notifications = [bubbleUp("b", "1")]
+    service.setAccountFilter("2")
+    service.setStateFilter("previous")
+
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "previous")
+
+    service.setAccountFilter("1")
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "bubbled")
+  }
+
+  function test_bubbled_tab_falls_back_when_the_account_filter_has_none() {
+    service.accounts = [{ id: "1", name: "One" }, { id: "2", name: "Two" }]
+    service.notifications = [bubbleUp("b", "1")]
+    service.setStateFilter("bubbled")
+    compare(service.stateFilter, "bubbled")
+
+    service.setAccountFilter("2")
+    compare(service.bubbledUpCount, 0)
+    compare(service.stateFilter, "unread")
+  }
+
+  function test_bubbled_tab_falls_back_when_a_refresh_removes_the_last_bubble_up() {
+    service.notifications = [bubbleUp("b", "1")]
+    service.setStateFilter("bubbled")
+
+    service._fetchedNotifications = [{ id: "old", accountId: "1", unread: false, bubbledUp: false }]
+    service.finishRefresh()
+    compare(service.stateFilter, "unread")
+  }
+
+  function findBubbleUpRemoveProcess() {
+    for (var i = 0; i < ProcessRegistry.processes.length; i++) {
+      var process = ProcessRegistry.processes[i]
+      if (process.command.length >= 3
+          && process.command[0] === "basecamp"
+          && process.command[1] === "bubble-up"
+          && process.command[2] === "remove") return process
+    }
+    return null
+  }
+
+  function poppableBubbleUp(id, accountId, recordingId) {
+    var item = bubbleUp(id, accountId)
+    item.recordingId = String(recordingId)
+    return item
+  }
+
+  function test_pop_removes_the_bubble_up_and_runs_the_cli() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = [item, { id: "old", accountId: "42", unread: false, bubbledUp: false }]
+    service.popBubbleUp(item)
+
+    compare(service.notifications.map(function(n) { return n.id }), ["old"])
+    compare(service.actionStatus, "Popping bubble-up…")
+    var process = findBubbleUpRemoveProcess()
+    verify(process !== null)
+    verify(process.running)
+    compare(process.command, ["basecamp", "bubble-up", "remove", "9001", "--account", "42", "--json"])
+
+    process.complete(0, '{"ok":true,"data":{"id":9001,"bubbled_up":false}}', "")
+    compare(service.actionStatus, "Popped bubble-up")
+  }
+
+  function test_failed_pop_shows_the_cli_error() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = [item]
+    service.popBubbleUp(item)
+
+    findBubbleUpRemoveProcess().complete(1, "", '{"ok":false,"error":"Recording not found"}')
+    compare(service.lastError, "Recording not found")
+    compare(service.actionStatus, "Recording not found")
+  }
+
+  function test_pop_ignores_items_it_cannot_pop() {
+    var unread = { id: "u", accountId: "42", unread: true, bubbledUp: false, recordingId: "1" }
+    var withoutRecording = poppableBubbleUp("b", "42", "")
+    service.notifications = [unread, withoutRecording]
+
+    service.popBubbleUp(unread)
+    service.popBubbleUp(withoutRecording)
+    compare(service.notifications.length, 2)
+    compare(findBubbleUpRemoveProcess(), null)
+  }
+
+  function test_pop_waits_for_a_running_read() {
+    var readProcess = beginRead("first")
+    var item = poppableBubbleUp("b", "42", "9001")
+    service.notifications = service.notifications.concat([item])
+    service.popBubbleUp(item)
+    compare(service.actionStatus, "Marking notification as read…")
+    compare(findBubbleUpRemoveProcess(), null)
+
+    readProcess.complete(0, "{}", "")
+    compare(service.actionStatus, "Popping bubble-up…")
+    var popProcess = findBubbleUpRemoveProcess()
+    verify(popProcess !== null)
+    verify(popProcess.running)
+  }
+
+  function test_post_action_refresh_survives_an_active_refresh_data() {
+    return [
+      { tag: "successful pop", exitCode: 0, expectedIds: [] },
+      { tag: "failed pop", exitCode: 1, expectedIds: ["b"] }
+    ]
+  }
+
+  function test_post_action_refresh_survives_an_active_refresh(data) {
+    var item = poppableBubbleUp("b", "42", "9001")
+    var rawItem = {
+      id: "b",
+      subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json"
+    }
+    var accounts = '{"ok":true,"data":[{"id":42,"name":"One"},{"id":43,"name":"Two"}]}'
+    service.notifications = [item]
+    service.refresh()
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, accounts, "")
+    var list = findNotificationListProcess()
+    list.complete(0, JSON.stringify({ ok: true, data: { bubble_ups: [rawItem] } }), "")
+
+    // Account One's response predates the pop; Account Two keeps the
+    // refresh in flight until the post-action timer has fired.
+    service.popBubbleUp(item)
+    findBubbleUpRemoveProcess().complete(data.exitCode, "{}", data.exitCode ? "Permission denied" : "")
+    wait(1300)
+    compare(service.refreshing, true)
+    list.complete(0, '{"ok":true,"data":{}}', "")
+    compare(service.notifications.map(function(n) { return n.id }), ["b"])
+
+    tryVerify(function() { return findProbeProcess() !== null }, 2000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, accounts, "")
+    list.complete(0, JSON.stringify({
+      ok: true,
+      data: { bubble_ups: data.exitCode ? [rawItem] : [] }
+    }), "")
+    list.complete(0, '{"ok":true,"data":{}}', "")
+    compare(service.refreshing, false)
+    compare(service.notifications.map(function(n) { return n.id }), data.expectedIds)
+  }
+
+  function test_post_action_refresh_waits_for_a_later_running_action() {
+    var item = poppableBubbleUp("b", "42", "9001")
+    // Let triggeredOnStart run before completing the initial refresh,
+    // otherwise it can start an unrelated fetch during the later action.
+    tryVerify(function() { return findProbeProcess() !== null }, 1000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+    findNotificationListProcess().complete(0, '{"ok":true,"data":{}}', "")
+    service.notifications = [item]
+    service.popBubbleUp(item)
+    findBubbleUpRemoveProcess().complete(0, "{}", "")
+
+    var read = beginRead("later")
+    wait(1300)
+    compare(service.refreshing, false)
+    compare(service.notifications[0].unread, false)
+
+    read.complete(0, "{}", "")
+    tryVerify(function() { return findProbeProcess() !== null }, 2000)
+    findProbeProcess().complete(0, probeOutput('{"ok":true,"data":{"authenticated":true}}'), "")
+    findAccountsProcess().complete(0, '{"ok":true,"data":[{"id":42,"name":"One"}]}', "")
+    findNotificationListProcess().complete(0, '{"ok":true,"data":{"reads":[{"id":"later"}]}}', "")
+    compare(service.notifications.map(function(n) { return n.id }), ["later"])
+    compare(service.notifications[0].unread, false)
   }
 }

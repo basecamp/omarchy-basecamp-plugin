@@ -31,6 +31,7 @@ Panel {
     property var accounts: []
     property var notifications: []
     property int unreadCount: 0
+    property int bubbledUpCount: 0
     property int accountCount: 0
     property string lastError: ""
     property string actionStatus: ""
@@ -40,6 +41,7 @@ Panel {
     function refreshIfStale() {}
     function openNotification() {}
     function markRead() {}
+    function popBubbleUp() {}
     function setAccountFilter() {}
     function setStateFilter() {}
     function tryStartSetup() { return false }
@@ -393,6 +395,7 @@ Panel {
         if (text === "r" || text === "R") service.refresh()
         else if (text === "u" || text === "U") root.setStateFilter("unread")
         else if (text === "p" || text === "P") root.setStateFilter("previous")
+        else if ((text === "b" || text === "B") && service.bubbledUpCount > 0) root.setStateFilter("bubbled")
       }
 
       ColumnLayout {
@@ -565,6 +568,22 @@ Panel {
               verticalPadding: Style.space(1)
               onClicked: root.setStateFilter("previous")
             }
+
+            Button {
+              visible: service.bubbledUpCount > 0
+              text: "RECENTLY BUBBLED UP"
+              selected: root.stateFilter === "bubbled"
+              // Same color the bar logo uses for unread notifications, so a
+              // tab with items still in it stands out.
+              foreground: service.bubbledUpCount > 0 ? root.urgent : root.foreground
+              background: "transparent"
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(1)
+              onClicked: root.setStateFilter("bubbled")
+            }
           }
         }
 
@@ -711,7 +730,8 @@ Panel {
 
                 PanelToolTip {
                   visible: rowMouse.containsMouse
-                  text: (notificationRow.modelData.type || "Notification") + (notificationRow.modelData.unread ? " · Unread" : " · Read")
+                  text: (notificationRow.modelData.type || "Notification")
+                    + (notificationRow.modelData.bubbledUp ? " · Bubbled up" : notificationRow.modelData.unread ? " · Unread" : " · Read")
                   fontFamily: root.fontFamily
                 }
 
@@ -795,7 +815,9 @@ Panel {
                   }
 
                   Rectangle {
+                    // Unread rows dismiss through this pill; bubble-ups pop through it.
                     visible: notificationRow.modelData.unread
+                      || (notificationRow.modelData.bubbledUp && notificationRow.modelData.recordingId !== "")
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: Style.space(2)
                     Layout.preferredHeight: Style.space(16)
@@ -837,7 +859,10 @@ Panel {
                       onPositionChanged: function(mouse) {
                         if (pointerGate.moved(notificationRow, mouse)) root.select(notificationRow.index)
                       }
-                      onClicked: service.markRead(notificationRow.modelData)
+                      onClicked: {
+                        if (notificationRow.modelData.bubbledUp) service.popBubbleUp(notificationRow.modelData)
+                        else service.markRead(notificationRow.modelData)
+                      }
                     }
                   }
                 }

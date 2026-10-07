@@ -10,18 +10,20 @@ A Quickshell bar plugin that shows notifications from all Basecamp accounts avai
 - Shows unread notifications by default.
 - Combines notifications from all accounts in newest-first order.
 - Filters notifications by account or between unread and all items.
+- Shows items you bubbled up in Basecamp 5 under `Recently bubbled up`, separate from your notifications. The tab only appears while the selected account has bubbled-up items, and it uses the same highlight color as the bar logo's unread state.
+- Pops a bubble-up from its badge without opening it.
 - Uses notification-type icons for comments, mentions, chats, events, completions, documents, bulletins, hills, and boosts.
 - Opens notifications in Basecamp and marks unread items as read.
 - Dismisses an unread notification from its count badge without opening it.
 - Changes the bar logo color when the currently selected account has unread notifications.
-- Shares unread state, account filter, and unread/previous tab across every monitor. Each bar still opens and closes on its own.
+- Shares unread state, account filter, and selected tab across every monitor. Each bar still opens and closes on its own.
 - Polls every 10 minutes from one shared service. Hover over the bar logo to refresh immediately.
 
 ## Requirements
 
 - Omarchy with Quickshell plugin support.
-- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) 0.9 or newer.
-- A full-access Basecamp CLI login. Version 0.9 and newer requests full access by default; read-only logins can view notifications but cannot mark them as read.
+- [Basecamp CLI](https://github.com/basecamp/basecamp-cli) 0.10 or newer.
+- A full-access Basecamp CLI login. Version 0.9 and newer requests full access by default; read-only logins can view notifications but cannot mark them as read or pop bubble-ups.
 
 Install the Basecamp CLI on Omarchy:
 
@@ -62,13 +64,14 @@ If the plugin ID is already installed, remove the existing copy first or use a s
 - Left-click the Basecamp logo to open or close the panel.
 - Hover over the logo to refresh.
 - Select an account to filter the combined feed.
-- Select `New for you` or `Previous notifications` below the Basecamp title.
+- Select `New for you`, `Previous notifications`, or `Recently bubbled up` below the Basecamp title. `Recently bubbled up` appears only while the selected account has bubbled-up items. If its last item goes away, or you switch to an account without any, the panel returns to `New for you`.
 - The selected tab is remembered. If a refresh finishes with unread notifications in any account while all panels are closed, the tab resets to `New for you` without changing the account filter. Refreshes that finish while any panel is open leave the selected tab unchanged, including hover refreshes that finish after you open the panel.
 - Click a notification to open it. Unread notifications are also marked as read.
 - Hover the unread count on a notification to reveal a dismiss control. Click it to mark the item as read without opening it.
+- Hover the arrow badge on a bubbled-up item to reveal a pop control. Click it to pop the bubble-up without opening the item. The row disappears immediately; a successful follow-up refresh restores it if the pop failed. That refresh waits for any active refresh or queued read/pop actions to finish.
 - Use the up and down arrow keys to move through notifications.
 - Use the left and right arrow keys to move through account filters.
-- Press `U` for unread notifications, `P` for previous notifications, or `R` to refresh.
+- Press `U` for unread notifications, `P` for previous notifications, `B` for recently bubbled up items, or `R` to refresh.
 - CLI failures show their error message rather than the raw JSON response. A token-refresh failure can result from lost connectivity; restore the connection and refresh before assuming the login is invalid.
 
 ## Development
@@ -131,6 +134,7 @@ basecamp auth status --json
 basecamp accounts list --json
 basecamp notifications list --account <account-id> --json
 basecamp notifications read <notification-id> --account <account-id> --json
+basecamp bubble-up remove <recording-id> --account <account-id> --json
 ```
 
 Notification data is held in the Quickshell process memory. The plugin does not write notification content, account details, credentials, or tokens to disk.
