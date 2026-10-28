@@ -60,7 +60,7 @@ test("demo CLI fixtures follow the production account and notification contracts
       assert.equal(parsed.ok, true)
       assert.ok(parsed.items.length > 0)
       const bubbleUps = parsed.items.filter(item => item.bubbledUp)
-      assert.ok(bubbleUps.every(item => item.recordingId !== ""))
+      assert.ok(bubbleUps.every(item => item.bubbleUpUrl !== ""))
       bubbleUpCounts.push(bubbleUps.length)
       allNotifications.push(...parsed.items)
     }
@@ -107,21 +107,22 @@ test("demo CLI keeps mark-as-read state for subsequent refreshes", () => {
   })
 })
 
-test("demo CLI pops bubble-ups for subsequent refreshes", () => {
+test("demo CLI pops a comment by its bubble-up URL without affecting other accounts", () => {
   withState(stateDir => {
     const list = account => Model.parseNotifications(JSON.stringify(successfulJson([
       "notifications", "list", "--account", account, "--json"
     ], stateDir)), { id: account, name: "Demo" }, 50).items.filter(item => item.bubbledUp)
 
-    const [popped, kept] = list("1001")
-    assert.ok(popped && kept)
-    const result = successfulJson([
-      "bubble-up", "remove", popped.recordingId, "--account", "1001", "--json"
-    ], stateDir)
-    assert.equal(result.data.bubbled_up, false)
-
-    assert.deepEqual(list("1001").map(item => item.id), [kept.id])
-    assert.equal(list("1002").length, 1)
+    const before = list("1001").map(item => item.id)
+    const [comment] = list("1002")
+    assert.equal(comment.type, "Comment")
+    const url = "https://3.basecampapi.com/1002/my/readings/515/bubble_up.json"
+    assert.equal(comment.bubbleUpUrl, url)
+    assert.notEqual(demo(["api", "delete", url, "--account", "1001", "--json"], stateDir).status, 0)
+    assert.notEqual(demo(["api", "delete", url + "-wrong", "--account", "1002", "--json"], stateDir).status, 0)
+    successfulJson(["api", "delete", url, "--account", "1002", "--json"], stateDir)
+    assert.deepEqual(list("1002").map(item => item.id), [])
+    assert.deepEqual(list("1001").map(item => item.id), before)
   })
 })
 

@@ -528,15 +528,15 @@ TestCase {
       var process = ProcessRegistry.processes[i]
       if (process.command.length >= 3
           && process.command[0] === "basecamp"
-          && process.command[1] === "bubble-up"
-          && process.command[2] === "remove") return process
+          && process.command[1] === "api"
+          && process.command[2] === "delete") return process
     }
     return null
   }
 
-  function poppableBubbleUp(id, accountId, recordingId) {
+  function poppableBubbleUp(id, accountId, readingId) {
     var item = bubbleUp(id, accountId)
-    item.recordingId = String(recordingId)
+    item.bubbleUpUrl = readingId ? "https://3.basecampapi.com/" + accountId + "/my/readings/" + readingId + "/bubble_up.json" : ""
     return item
   }
 
@@ -550,7 +550,7 @@ TestCase {
     var process = findBubbleUpRemoveProcess()
     verify(process !== null)
     verify(process.running)
-    compare(process.command, ["basecamp", "bubble-up", "remove", "9001", "--account", "42", "--json"])
+    compare(process.command, ["basecamp", "api", "delete", "https://3.basecampapi.com/42/my/readings/9001/bubble_up.json", "--account", "42", "--json"])
 
     process.complete(0, '{"ok":true,"data":{"id":9001,"bubbled_up":false}}', "")
     compare(service.actionStatus, "Popped bubble-up")
@@ -567,12 +567,12 @@ TestCase {
   }
 
   function test_pop_ignores_items_it_cannot_pop() {
-    var unread = { id: "u", accountId: "42", unread: true, bubbledUp: false, recordingId: "1" }
-    var withoutRecording = poppableBubbleUp("b", "42", "")
-    service.notifications = [unread, withoutRecording]
+    var unread = { id: "u", accountId: "42", unread: true, bubbledUp: false, bubbleUpUrl: "https://3.basecampapi.com/42/my/readings/1/bubble_up.json" }
+    var withoutUrl = poppableBubbleUp("b", "42", "")
+    service.notifications = [unread, withoutUrl]
 
     service.popBubbleUp(unread)
-    service.popBubbleUp(withoutRecording)
+    service.popBubbleUp(withoutUrl)
     compare(service.notifications.length, 2)
     compare(findBubbleUpRemoveProcess(), null)
   }
@@ -603,7 +603,7 @@ TestCase {
     var item = poppableBubbleUp("b", "42", "9001")
     var rawItem = {
       id: "b",
-      subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json"
+      bubble_up_url: "https://3.basecampapi.com/42/my/readings/9001/bubble_up.json"
     }
     var accounts = '{"ok":true,"data":[{"id":42,"name":"One"},{"id":43,"name":"Two"}]}'
     service.notifications = [item]

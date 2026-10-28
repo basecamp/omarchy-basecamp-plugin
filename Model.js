@@ -8,8 +8,8 @@ function parseCliVersion(raw) {
   var patch = parseInt(match[3], 10)
   var prerelease = String(match[4] || "")
   var buildMetadata = String(match[5] || "")
-  var newerThanMinimum = major > 0 || minor > 10 || (minor === 10 && patch > 0)
-  var minimumRelease = major === 0 && minor === 10 && patch === 0 && prerelease === ""
+  var newerThanMinimum = major > 0 || minor > 9 || (minor === 9 && patch > 0)
+  var minimumRelease = major === 0 && minor === 9 && patch === 0 && prerelease === ""
 
   return {
     ok: true,
@@ -58,7 +58,7 @@ function setupPlan(installed, supported, authenticated, ipcTarget) {
     plan.buttonLabel = "Install Basecamp CLI…"
     plan.fix = "omarchy-pkg-add basecamp-cli && basecamp auth login"
   } else if (supported !== true) {
-    plan.title = "Basecamp CLI 0.10 or newer is required"
+    plan.title = "Basecamp CLI 0.9 or newer is required"
     plan.command = "omarchy update"
     plan.buttonLabel = "Update Omarchy…"
     plan.fix = "omarchy update"
@@ -184,13 +184,6 @@ function normalizeAppUrl(rawUrl) {
   return url.replace("https://3.basecampapi.com/", "https://app.basecamp.com/")
 }
 
-// `bubble-up remove` pops by recording id. Every readable's subscription URL
-// carries that id, including pings, whose web URLs the CLI cannot parse.
-function subscriptionRecordingId(rawUrl) {
-  var match = String(rawUrl || "").match(/\/recordings\/(\d+)\/subscription\.json/)
-  return match ? match[1] : ""
-}
-
 function normalizeNotification(value, account, unread, bubbledUp) {
   var item = value || {}
   var id = String(item.id || "").trim()
@@ -221,7 +214,7 @@ function normalizeNotification(value, account, unread, bubbledUp) {
     unread: unread === true,
     unreadCount: positiveInteger(item.unread_count, 0),
     bubbledUp: bubbledUp === true,
-    recordingId: subscriptionRecordingId(item.subscription_url)
+    bubbleUpUrl: String(item.bubble_up_url || "").trim()
   }
 }
 
@@ -253,6 +246,12 @@ function filterNotifications(items, accountId, state) {
     if (selectedState === "bubbled") return item.bubbledUp === true
     return true
   })
+}
+
+function visibleNotifications(items, accountId, state) {
+  var rows = filterNotifications(items, accountId, state)
+  if (state !== "unread") return rows
+  return filterNotifications(items, accountId, "bubbled").slice(0, 2).concat(rows)
 }
 
 function unreadCount(items, accountId) {
@@ -372,6 +371,7 @@ if (typeof module !== "undefined") {
     normalizeAppUrl: normalizeAppUrl,
     sortNotifications: sortNotifications,
     filterNotifications: filterNotifications,
+    visibleNotifications: visibleNotifications,
     unreadCount: unreadCount,
     accountFilterOptions: accountFilterOptions,
     notificationTypeIcon: notificationTypeIcon,

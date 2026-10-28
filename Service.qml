@@ -255,12 +255,12 @@ Item {
   }
 
   function popBubbleUp(item) {
-    if (!item || item.bubbledUp !== true || !item.recordingId) return
+    if (!item || item.bubbledUp !== true || !item.bubbleUpUrl) return
     notifications = notifications.filter(function(existing) {
       return !(existing.bubbledUp === true && existing.id === item.id && existing.accountId === item.accountId)
     })
     enqueueAction({
-      command: ["basecamp", "bubble-up", "remove", String(item.recordingId), "--account", String(item.accountId), "--json"],
+      command: ["basecamp", "api", "delete", String(item.bubbleUpUrl), "--account", String(item.accountId), "--json"],
       pending: "Popping bubble-up…",
       done: "Popped bubble-up",
       failure: "Could not pop the bubble-up"

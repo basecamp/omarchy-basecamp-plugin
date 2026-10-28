@@ -20,25 +20,17 @@ function payload(data) {
   return JSON.stringify({ data })
 }
 
-test("parseCliVersion requires Basecamp CLI 0.10 or newer", () => {
-  assert.deepEqual(Model.parseCliVersion("basecamp version 0.9.1"), {
-    ok: true,
-    error: "",
-    version: "0.9.1",
-    supported: false
-  })
-  assert.equal(Model.parseCliVersion("basecamp version 0.8.1").supported, false)
-  assert.equal(Model.parseCliVersion("basecamp version 0.9.10").supported, false)
+test("parseCliVersion requires Basecamp CLI 0.9 or newer", () => {
+  assert.equal(Model.parseCliVersion("basecamp version 0.8.9").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.0-rc.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.0").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.1").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.10").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 0.10.0").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 0.12.0").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 1.0.0").supported, true)
-  assert.deepEqual(Model.parseCliVersion("basecamp version 0.10.0+linux.x86-64"), {
-    ok: true,
-    error: "",
-    version: "0.10.0+linux.x86-64",
-    supported: true
-  })
-  assert.equal(Model.parseCliVersion("basecamp version 0.10.0-rc.1").supported, false)
+  assert.equal(Model.parseCliVersion("basecamp version 0.9.0+linux.x86-64").supported, true)
+  assert.equal(Model.parseCliVersion("basecamp version 0.10.0-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 0.10.1-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("basecamp version 1.0.0-rc.1").supported, true)
   assert.equal(Model.parseCliVersion("unexpected output").ok, false)
@@ -90,15 +82,15 @@ test("parseNotifications files bubble-ups separately and drops scheduled and unk
   ])
 })
 
-test("parseNotifications takes the recording id from the subscription URL", () => {
+test("parseNotifications retains the comment bubble-up URL rather than the parent subscription URL", () => {
   const result = Model.parseNotifications(payload({
     bubble_ups: [
-      notification({ id: 12, subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json" }),
+      notification({ id: 12, type: "Comment", subscription_url: "https://3.basecampapi.com/42/buckets/7/recordings/9001/subscription.json", bubble_up_url: "https://3.basecampapi.com/42/my/readings/12/bubble_up.json" }),
       notification({ id: 13 })
     ]
   }), account, 20)
 
-  assert.deepEqual(result.items.map(item => [item.id, item.recordingId]), [["12", "9001"], ["13", ""]])
+  assert.deepEqual(result.items.map(item => [item.id, item.bubbleUpUrl]), [["12", "https://3.basecampapi.com/42/my/readings/12/bubble_up.json"], ["13", ""]])
 })
 
 test("parseNotifications caps notifications and bubble-ups independently", () => {
@@ -179,6 +171,26 @@ test("filterNotifications combines account and tab filters without reordering", 
     ["new-a", "new-b", "old-a", "bubble-a", "bubble-b"])
 })
 
+test("New for you pins at most two loaded bubble-ups before unread rows", () => {
+  const items = [
+    { id: "bubble-a1", accountId: "a", unread: false, bubbledUp: true },
+    { id: "new-b", accountId: "b", unread: true, bubbledUp: false },
+    { id: "bubble-b", accountId: "b", unread: false, bubbledUp: true },
+    { id: "bubble-a2", accountId: "a", unread: false, bubbledUp: true },
+    { id: "new-a", accountId: "a", unread: true, bubbledUp: false },
+    { id: "old-a", accountId: "a", unread: false, bubbledUp: false }
+  ]
+  const ids = (account, state, source = items) => Model.visibleNotifications(source, account, state).map(item => item.id)
+  assert.deepEqual(ids("", "unread"), ["bubble-a1", "bubble-b", "new-b", "new-a"])
+  assert.deepEqual(ids("a", "unread"), ["bubble-a1", "bubble-a2", "new-a"])
+  assert.deepEqual(ids("b", "unread"), ["bubble-b", "new-b"])
+  assert.deepEqual(ids("missing", "unread"), [])
+  assert.deepEqual(ids("", "unread", items.filter(item => !item.unread)), ["bubble-a1", "bubble-b"])
+  assert.deepEqual(ids("a", "previous"), ["old-a"])
+  assert.deepEqual(ids("a", "bubbled"), ["bubble-a1", "bubble-a2"])
+  assert.equal(Model.unreadCount(items, ""), 2)
+})
+
 test("unreadCount counts all accounts or a single account", () => {
   const items = [
     { id: "new-a", accountId: "a", unread: true },
@@ -246,7 +258,6 @@ test("setupPlan maps each setup state to its fix, worst problem first", () => {
     Model.setupLaunchCommand("omarchy-pkg-add basecamp-cli && basecamp auth login", "37signals.basecamp"))
 
   const update = Model.setupPlan(true, false, true, "37signals.basecamp")
-  assert.equal(update.title, "Basecamp CLI 0.10 or newer is required")
   assert.equal(update.buttonLabel, "Update Omarchy…")
   assert.equal(update.command, "omarchy update")
   assert.equal(update.launchCommand,

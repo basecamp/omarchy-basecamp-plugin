@@ -78,7 +78,9 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var filteredNotifications: Model.filterNotifications(service.notifications, accountFilter, stateFilter)
+  readonly property var filteredNotifications: Model.visibleNotifications(service.notifications, accountFilter, stateFilter)
+  readonly property int pinnedCount: stateFilter === "unread" ? Math.min(2, service.bubbledUpCount) : 0
+  readonly property int moreBubbleUps: Math.max(0, service.bubbledUpCount - pinnedCount)
   readonly property var accountFilterOptions: Model.accountFilterOptions(service.accounts)
 
   readonly property var accountDropdownOptions: {
@@ -221,8 +223,8 @@ Panel {
   }
 
   function scrollSelectionIntoView() {
-    if (!notificationColumn || selectedIndex < 0 || selectedIndex >= notificationColumn.children.length) return
-    var wrapper = notificationColumn.children[selectedIndex]
+    if (selectedIndex < 0 || selectedIndex >= notificationRepeater.count) return
+    var wrapper = notificationRepeater.itemAt(selectedIndex)
     Qt.callLater(function() {
       if (!wrapper || !panelFlick) return
       var point = wrapper.mapToItem(panelFlick.contentItem, 0, 0)
@@ -571,11 +573,9 @@ Panel {
 
             Button {
               visible: service.bubbledUpCount > 0
-              text: "RECENTLY BUBBLED UP"
+              text: "BUBBLED UP"
               selected: root.stateFilter === "bubbled"
-              // Same color the bar logo uses for unread notifications, so a
-              // tab with items still in it stands out.
-              foreground: service.bubbledUpCount > 0 ? root.urgent : root.foreground
+              foreground: root.foreground
               background: "transparent"
               accent: Color.accent
               fontFamily: root.fontFamily
@@ -705,14 +705,55 @@ Panel {
             width: parent.width
             spacing: Style.space(8)
 
+            Item {
+              visible: root.pinnedCount > 0
+              width: parent.width
+              height: visible ? Math.max(sectionTitle.implicitHeight, viewMore.implicitHeight) : 0
+
+              Text {
+                id: sectionTitle
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "RECENTLY BUBBLED UP"
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Button {
+                id: viewMore
+                visible: root.moreBubbleUps > 0
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "View " + root.moreBubbleUps + " more"
+                foreground: root.foreground
+                background: "transparent"
+                accent: Color.accent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.caption
+                horizontalPadding: Style.space(7)
+                verticalPadding: Style.space(1)
+                onClicked: root.setStateFilter("bubbled")
+              }
+            }
+
             Repeater {
+              id: notificationRepeater
               model: root.filteredNotifications
+
+              Item {
+                id: rowWrapper
+                required property var modelData
+                required property int index
+                readonly property bool lastPinned: root.pinnedCount > 0 && index === root.pinnedCount - 1
+                width: notificationColumn.width
+                implicitHeight: notificationRow.implicitHeight + (lastPinned ? Style.space(16) : 0)
 
               CursorSurface {
                 id: notificationRow
-                required property var modelData
-                required property int index
-                width: notificationColumn.width
+                readonly property var modelData: rowWrapper.modelData
+                readonly property int index: rowWrapper.index
+                width: parent.width
                 foreground: root.foreground
                 hasCursor: root.cursorActive && root.selectedIndex === index
                 implicitHeight: rowContent.implicitHeight + Style.space(16)
@@ -817,7 +858,7 @@ Panel {
                   Rectangle {
                     // Unread rows dismiss through this pill; bubble-ups pop through it.
                     visible: notificationRow.modelData.unread
-                      || (notificationRow.modelData.bubbledUp && notificationRow.modelData.recordingId !== "")
+                      || (notificationRow.modelData.bubbledUp && notificationRow.modelData.bubbleUpUrl)
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: Style.space(2)
                     Layout.preferredHeight: Style.space(16)
@@ -867,6 +908,25 @@ Panel {
                   }
                 }
               }
+
+              PanelSeparator {
+                visible: rowWrapper.lastPinned
+                anchors.bottom: parent.bottom
+                foreground: root.foreground
+              }
+              }
+            }
+
+            Text {
+              visible: root.pinnedCount > 0 && root.filteredNotifications.length === root.pinnedCount && service.lastError === ""
+              width: parent.width
+              text: "You're all caught up."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              horizontalAlignment: Text.AlignHCenter
+              topPadding: Style.space(16)
+              bottomPadding: Style.space(18)
             }
           }
         }
